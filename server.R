@@ -39,8 +39,7 @@ shinyServer(function(input, output, session) {
 
     
     getResultTable <- reactive({
-        input$apply
-        isolate({
+   
             progress <- shiny::Progress$new(session, min=0, max=3)
             on.exit(progress$close())
             
@@ -80,13 +79,19 @@ shinyServer(function(input, output, session) {
                 as.data.frame(res), 
                 Plot=''
             )
-            rv$table <- tab[,-ncol(tab)]
             return(tab)
-        })
+   
     })
     
+    output$info <- renderText({
+        input$apply
+        rv$table <- isolate( getResultTable() )
+        return(rv$info)
+    })
+    
+
     output$data <- renderDataTable(
-        getResultTable(),
+        rv$table,
         options = list(
             pageLength = 10,
             order=I('[[ 7, "asc" ]]'),
@@ -94,15 +99,14 @@ shinyServer(function(input, output, session) {
             columns = I(readLines('colDef.js'))
         )
     )
-    
-    output$info <- renderText({ return(rv$info) })
+
     
     output$downloadData <- downloadHandler(
         filename = function() {
             paste('DEview_data_', gsub(' ', '_', Sys.time()), '.csv', sep='')
         },
         content = function(con) {
-            write.csv(rv$table, con, row.names = FALSE)
+            write.csv(rv$table[,-ncol(rv$table)], con, row.names = FALSE)
         }
     )
     

@@ -2,7 +2,7 @@ library(shiny)
 load('dssTC.Rdata')
 library(DESeq2)
 library(ggplot2)
-#library(DT)
+library(DT)
 
 shinyUI(fluidPage(
 
@@ -39,7 +39,7 @@ shinyUI(fluidPage(
       column(
           8,
           tags$br(),
-          dataTableOutput("data"),
+          DT::dataTableOutput("data"),
           downloadButton('downloadData', label = "Get result table as CSV", class = NULL),
           downloadButton('downloadFigure', label = "Get figure as PDF", class = NULL),
           downloadButton('downloadDataFlt', label = "Get filtered results as CSV", class = NULL),

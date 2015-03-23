@@ -2,7 +2,7 @@ library(shiny)
 load('dssTC.Rdata')
 library(DESeq2)
 library(ggplot2)
-#library(DT)
+library(DT)
 
 
 shinyServer(function(input, output, session) {
@@ -88,17 +88,44 @@ shinyServer(function(input, output, session) {
         rv$table <- isolate( getResultTable() )
         return(rv$info)
     })
-    
 
-    output$data <- renderDataTable(
-        rv$table,
-        options = list(
-            pageLength = 10,
-            order=I('[[ 7, "asc" ]]'),
-            lengthMenu=I('[[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]]'),
-            columns = I(readLines('colDef.js'))
-        )
-    )
+    output$data = DT::renderDataTable({
+        action = session$registerDataObj('iris', rv$table, shiny:::dataTablesJSON)
+        datatable(
+            rv$table, 
+            server = TRUE, 
+            rownames = FALSE,
+            extensions = 'TableTools'
+            options = list(
+                processing = TRUE,
+                order=JS('[[ 7, "asc" ]]'),
+                pageLength = 5,
+                lengthMenu=JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
+                columns = JS(readLines('colDef.js')),
+                ajax = list(
+                    url = action, 
+                    type = 'POST', 
+                    data = JS(
+                        'function(d) {',
+                        'd.search.caseInsensitive = false;',
+                        'd.escape = true;',
+                        '}'
+                    )
+                )
+            )
+        )    
+        
+    })
+
+#     output$data <- renderDataTable(
+#         datatable(rv$table)
+# #         ,options = list(
+# #             pageLength = 10,
+# #             order=I('[[ 7, "asc" ]]'),
+# #             lengthMenu=I('[[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]]'),
+# #             columns = I(readLines('colDef.js'))
+# #         )
+#     )
 
     
     output$downloadData <- downloadHandler(

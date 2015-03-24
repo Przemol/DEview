@@ -7,7 +7,7 @@ library(DT)
 shinyUI(fluidPage(
 
   # Application title
-  
+  singleton(tags$script(type="text/javascript", src="js/colum_filter.js")),
   
   fluidRow(
       column(
@@ -45,7 +45,12 @@ shinyUI(fluidPage(
           downloadButton('downloadDataFlt', label = "Get filtered results as CSV", class = NULL),
           tags$br(),
           tags$strong('Numeric column definitions:'),
-          verbatimTextOutput('info')
+          verbatimTextOutput('info'),
+          div( 
+              class='', id='debug', tags$hr(),
+              'Debug console: ', tags$br(), tags$textarea(id='debug_cmd', rows=4, style='width:88%'),
+              actionButton('debug_submit', 'Submit'), verbatimTextOutput("debug_out")
+          )
 
       )
       

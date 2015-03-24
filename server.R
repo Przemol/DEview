@@ -91,17 +91,77 @@ shinyServer(function(input, output, session) {
 
     output$data = DT::renderDataTable({
         action = session$registerDataObj('iris', rv$table, shiny:::dataTablesJSON)
+        sketch = htmltools::withTags(table(
+            tableHeader(rv$table),
+            tableFooter(rep('', ncol(rv$table)))
+        ))
+        callback = JS("
+            $('table tfoot th').slice(0,2).each( function () {
+                var title = $('table thead th').eq( $(this).index() ).text();
+                var width = $('table thead th').eq( $(this).index() ).width()+25;
+                $(this).html( '<input type=\"text\" placeholder=\"'+title+'\" style=\"width:'+width+'px;\" />' );
+            } );
+
+            $('table tfoot th').slice(3,9).each( function () {
+                var title = $('table thead th').eq( $(this).index() ).text();
+                var width = 50;
+                $(this).html( '<input class=\"min\" type=\"text\" placeholder=\"'+'min'+'\" style=\"width:'+width+'px;\" /><br />' +
+                              '<input class=\"max\" type=\"text\" placeholder=\"'+'max'+'\" style=\"width:'+width+'px;\" />' );
+            } );
+            $('table tfoot th').css('text-align', 'right');
+            $('table tfoot th').css('padding', 5);
+
+            table.columns().eq( 0 ).each( function ( colIdx ) {
+                $( 'input', table.column( colIdx ).footer() ).on( 'keyup change', function () {
+
+                    if(this.className == 'min') {
+                        var flt = $(this).val() + ',' + $(this).siblings('.max').val();
+                        table.column( colIdx ).search( flt ).draw();
+                    } else if(this.className == 'max') {
+                        var flt = $(this).siblings('.min').val() + ',' + $(this).val();
+                        table.column( colIdx ).search( flt ).draw();
+                    } else {
+                        table.column( colIdx ).search( this.value ).draw();
+                    }
+                } );
+            } );
+        ")
+        
+        btn <- JS('["copy", "csv", "xls", "pdf", "print",
+                {
+                    "sExtends": "copy",
+                    "sButtonText": "Copy columns",
+                    "mColumns": [ 0, 1, 4 ],
+                      oSelectorOpts: {
+        filter: "applied"
+    }
+                },
+                {
+                    "sExtends": "ajax",
+                    "sButtonText": "Visible columns",
+                    "mColumns": "visible"
+                },
+{"sExtends": "text", "sButtonText": "Select filtered", "fnClick": function ( node, conf ) {
+                 this.fnSelectAll( true )
+                 alert("Total selections: "+ this.fnGetSelectedData().length +" rows!")
+               } }, "select_none"
+            ]')
+        
         datatable(
             rv$table, 
             server = TRUE, 
             rownames = FALSE,
-            extensions = 'TableTools'
+            extensions = 'TableTools',
+            container = sketch,
+            callback = callback,
             options = list(
                 processing = TRUE,
                 order=JS('[[ 7, "asc" ]]'),
-                pageLength = 5,
+                pageLength = 10,
                 lengthMenu=JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
                 columns = JS(readLines('colDef.js')),
+                dom = 'T<"clear">lfrtip',
+                tableTools = list(aButtons=btn, sRowSelect="multi", sSwfPath = copySWF(dest='www', pdf = TRUE)),
                 ajax = list(
                     url = action, 
                     type = 'POST', 
@@ -113,7 +173,7 @@ shinyServer(function(input, output, session) {
                     )
                 )
             )
-        )    
+        )  %>% formatRound(4:5, 2)    
         
     })
 
@@ -150,10 +210,17 @@ shinyServer(function(input, output, session) {
         }
     )
     
-    output$downloadDataFlt = downloadHandler('mtcars-filtered.csv', content = function(file) {
-        s = input$data_rows_all
-        write.csv(rv$table[s, , drop = FALSE], file)
-    })
+    output$downloadDataFlt = downloadHandler(
+        filename = function() {
+            paste('DEview_data_', gsub(' ', '_', Sys.time()), '.csv', sep='')
+        },
+        content = function(file) {
+            s = input$data_rows_all
+            message(length(s))
+            message(length(input$data_rows_current))
+            write.csv(rv$table[s, -ncol(rv$table), drop = FALSE], file, row.names = FALSE)
+        }
+    )
     
 
 })

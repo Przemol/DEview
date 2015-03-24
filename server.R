@@ -48,7 +48,7 @@ shinyServer(function(input, output, session) {
             
             if(input$type == 'TS') {
                 res <- results(ddsTC)
-                res$log2FoldChange <- res$lfcSE <- ''
+                res$log2FoldChange <- res$lfcSE <- NA
                 rv$info <- paste0(
                     'Log2 Fold Change and its standard error available for paired tests only!\n', 
                     paste0(elementMetadata(res)[-(2:3),2], collapse='\n')
@@ -72,12 +72,13 @@ shinyServer(function(input, output, session) {
             progress$set(message = 'Building result table', value = 3,
                          detail = 'This may take a while...')
             
-            tab <- cbind(
+            tab <- data.frame(
                 ID=rownames(res), 
-                gene=mcols(ddsTC)$geneName,
-                info=mcols(ddsTC)$desc,
+                gene=as.character(mcols(ddsTC)$geneName),
+                info=as.character(mcols(ddsTC)$desc),
                 as.data.frame(res), 
-                Plot=''
+                Plot=NA,
+                stringsAsFactors = FALSE
             )
             return(tab)
    
@@ -131,10 +132,18 @@ shinyServer(function(input, output, session) {
                 {
                     "sExtends": "copy",
                     "sButtonText": "Copy columns",
-                    "mColumns": [ 0, 1, 4 ],
-                      oSelectorOpts: {
-        filter: "applied"
-    }
+                    "fnClick": function (  ) {
+                        dt = new $.fn.dataTable.Api( this.s.dt );
+                        zz=dt.ajax.params();
+                        zz.length=-1;
+                        z=$.ajax({
+                          dataType: "json",
+                          url: dt.ajax.url(),
+                          data: zz, method: "POST"
+                        });
+Shiny.shinyapp.sendInput({zz:zz})
+                        return(z.responseJSON)
+                    }
                 },
                 {
                     "sExtends": "ajax",
@@ -143,6 +152,7 @@ shinyServer(function(input, output, session) {
                 },
 {"sExtends": "text", "sButtonText": "Select filtered", "fnClick": function ( node, conf ) {
                  this.fnSelectAll( true )
+dt = new $.fn.dataTable.Api( this.s.dt );
                  alert("Total selections: "+ this.fnGetSelectedData().length +" rows!")
                } }, "select_none"
             ]')
@@ -151,17 +161,23 @@ shinyServer(function(input, output, session) {
             rv$table, 
             server = TRUE, 
             rownames = FALSE,
-            extensions = 'TableTools',
+            extensions = c('TableTools'),
             container = sketch,
             callback = callback,
             options = list(
                 processing = TRUE,
+                serverSide= TRUE,
+                
+                deferRender = TRUE,
+                scrollY = 385,
+                
                 order=JS('[[ 7, "asc" ]]'),
                 pageLength = 10,
                 lengthMenu=JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
                 columns = JS(readLines('colDef.js')),
                 dom = 'T<"clear">lfrtip',
-                tableTools = list(aButtons=btn, sRowSelect="multi", sSwfPath = copySWF(dest='www', pdf = TRUE)),
+                tableTools = list(aButtons=btn, sRowSelect="os", sSwfPath = copySWF(dest='www', pdf = TRUE)),
+                #fnServerParams= JS(" function ( aoData ) {  }"),
                 ajax = list(
                     url = action, 
                     type = 'POST', 
@@ -209,18 +225,84 @@ shinyServer(function(input, output, session) {
             #ggsave(con, rv$plot, height=6, width=12)
         }
     )
+
+    getFLT <- function(data, q) {
+        n <- nrow(data)
+        ci <- q$search[["caseInsensitive"]] == TRUE
+        i <- seq_len(n)
+        if (q$search[["value"]] != "") {
+            i0 <- apply(data, 2, function(x) {
+                shiny:::grep2(q$search[["value"]], as.character(x), fixed = q$search[["regex"]] == 
+                          FALSE, ignore.case = ci)
+            })
+            i <- intersect(i, unique(unlist(i0)))
+        }
+        if (length(i)) 
+            for (j in seq_len(length(q$columns))) {
+                col <- q$columns[[j]]
+                if (col[["searchable"]] != TRUE) 
+                    next
+                if ((k <- col[["search"]][["value"]]) == "") 
+                    next
+                j <- as.integer(j)
+                dj <- data[, j]
+                r <- shiny:::commaToRange(k)
+                ij <- if (length(r) == 2 && is.numeric(dj)) {
+                    which(dj >= r[1] & dj <= r[2])
+                } else {
+                    shiny:::grep2(k, as.character(dj), fixed = col[["search"]][["regex"]] == 
+                              FALSE, ignore.case = ci)
+                }
+                i <- intersect(ij, i)
+                if (length(i) == 0) 
+                    break
+            }
+        if (length(i) != n) 
+            data <- data[i, , drop = FALSE]
+
+        
+        for (ord in q$order) {
+            k <- ord[["column"]]
+            d <- ord[["dir"]]
+            
+            data <- data[order(data[,as.integer(k) + 1], decreasing = (d!="asc")), , drop = FALSE]
+            
+        }
+
+        return(data)
+    }
     
     output$downloadDataFlt = downloadHandler(
         filename = function() {
             paste('DEview_data_', gsub(' ', '_', Sys.time()), '.csv', sep='')
         },
         content = function(file) {
-            s = input$data_rows_all
-            message(length(s))
-            message(length(input$data_rows_current))
-            write.csv(rv$table[s, -ncol(rv$table), drop = FALSE], file, row.names = FALSE)
+#             s = input$selected
+#             message(length(s))
+#             message(length(input$data_rows_current))
+            out <- getFLT(rv$table, input$selection)
+            write.csv(out[, -ncol(rv$table), drop = FALSE], file, row.names = FALSE)
         }
     )
+# 
+# output$data2 <- DT::renderDataTable({    
+#     action = dataTableAjax(session, rv$table, rownames = FALSE)
+#     datatable(
+#         rv$table, 
+#         #server = TRUE, 
+#         rownames = FALSE,
+# 
+#         options = list(
+#             #ajax = list(url = action),
+#             columns = JS(readLines('colDef.js'))
+#         )
+#     )
+# })
+
+output$debug_out <- renderPrint({
+    if(input$debug_submit==0) return()
+    isolate( eval(parse(text=input$debug_cmd)) )
+})
     
 
 })

@@ -50,7 +50,8 @@ shinyUI(fluidPage(
               class='', id='debug', tags$hr(),
               'Debug console: ', tags$br(), tags$textarea(id='debug_cmd', rows=4, style='width:88%'),
               actionButton('debug_submit', 'Submit'), verbatimTextOutput("debug_out")
-          )
+          ),
+          DT::dataTableOutput("data2")
 
       )
       

@@ -97,63 +97,14 @@ shinyServer(function(input, output, session) {
             tableFooter(rep('', ncol(rv$table)))
         ))
         callback = JS("
-            $('table tfoot th').slice(0,2).each( function () {
-                var title = $('table thead th').eq( $(this).index() ).text();
-                var width = $('table thead th').eq( $(this).index() ).width()+25;
-                $(this).html( '<input type=\"text\" placeholder=\"'+title+'\" style=\"width:'+width+'px;\" />' );
-            } );
-
-            $('table tfoot th').slice(3,9).each( function () {
-                var title = $('table thead th').eq( $(this).index() ).text();
-                var width = 50;
-                $(this).html( '<input class=\"min\" type=\"text\" placeholder=\"'+'min'+'\" style=\"width:'+width+'px;\" /><br />' +
-                              '<input class=\"max\" type=\"text\" placeholder=\"'+'max'+'\" style=\"width:'+width+'px;\" />' );
-            } );
-            $('table tfoot th').css('text-align', 'right');
-            $('table tfoot th').css('padding', 5);
-
-            table.columns().eq( 0 ).each( function ( colIdx ) {
-                $( 'input', table.column( colIdx ).footer() ).on( 'keyup change', function () {
-
-                    if(this.className == 'min') {
-                        var flt = $(this).val() + ',' + $(this).siblings('.max').val();
-                        table.column( colIdx ).search( flt ).draw();
-                    } else if(this.className == 'max') {
-                        var flt = $(this).siblings('.min').val() + ',' + $(this).val();
-                        table.column( colIdx ).search( flt ).draw();
-                    } else {
-                        table.column( colIdx ).search( this.value ).draw();
-                    }
-                } );
-            } );
+    
         ")
         
-        btn <- JS('["copy", "csv", "xls", "pdf", "print",
-                {
-                    "sExtends": "copy",
-                    "sButtonText": "Copy columns",
-                    "fnClick": function (  ) {
-                        dt = new $.fn.dataTable.Api( this.s.dt );
-                        zz=dt.ajax.params();
-                        zz.length=-1;
-                        z=$.ajax({
-                          dataType: "json",
-                          url: dt.ajax.url(),
-                          data: zz, method: "POST"
-                        });
-Shiny.shinyapp.sendInput({zz:zz})
-                        return(z.responseJSON)
-                    }
-                },
-                {
-                    "sExtends": "ajax",
-                    "sButtonText": "Visible columns",
-                    "mColumns": "visible"
-                },
-{"sExtends": "text", "sButtonText": "Select filtered", "fnClick": function ( node, conf ) {
-                 this.fnSelectAll( true )
-dt = new $.fn.dataTable.Api( this.s.dt );
-                 alert("Total selections: "+ this.fnGetSelectedData().length +" rows!")
+        btn <- JS('[
+            "copy", "csv", "xls", "pdf", "print",
+            {"sExtends": "text", "sButtonText": "Select all visible", "fnClick": function ( node, conf ) {
+                 this.fnSelectAll( true );
+                 alert("Total selections: "+ this.fnGetSelectedData().length +" rows!");
                } }, "select_none"
             ]')
         
@@ -163,7 +114,7 @@ dt = new $.fn.dataTable.Api( this.s.dt );
             rownames = FALSE,
             extensions = c('TableTools'),
             container = sketch,
-            callback = callback,
+            callback = JS(readLines('callback.js')),,
             options = list(
                 processing = TRUE,
                 serverSide= TRUE,
@@ -177,19 +128,13 @@ dt = new $.fn.dataTable.Api( this.s.dt );
                 columns = JS(readLines('colDef.js')),
                 dom = 'T<"clear">lfrtip',
                 tableTools = list(aButtons=btn, sRowSelect="os", sSwfPath = copySWF(dest='www', pdf = TRUE)),
-                #fnServerParams= JS(" function ( aoData ) {  }"),
+                #fnServerParams= JS("function(params) {Shiny.shinyapp.sendInput({sel:this.DataTable().ajax.params()});}"),
                 ajax = list(
                     url = action, 
-                    type = 'POST', 
-                    data = JS(
-                        'function(d) {',
-                        'd.search.caseInsensitive = false;',
-                        'd.escape = true;',
-                        '}'
-                    )
+                    type = 'POST'
                 )
             )
-        )  %>% formatRound(4:5, 2)    
+        )  %>% formatRound(4:7, 2)    
         
     })
 
@@ -280,7 +225,7 @@ dt = new $.fn.dataTable.Api( this.s.dt );
 #             s = input$selected
 #             message(length(s))
 #             message(length(input$data_rows_current))
-            out <- getFLT(rv$table, input$selection)
+            out <- getFLT(rv$table, input$sel)
             write.csv(out[, -ncol(rv$table), drop = FALSE], file, row.names = FALSE)
         }
     )

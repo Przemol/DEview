@@ -27,15 +27,27 @@ shinyServer(function(input, output, session) {
         
     })
     
-    observe({
-        if(input$type == 'TS') return()
-        cc <- rev(levels(colData(ddsTC)[[input$type]]))
-        updateSelectInput(session, 'p1', choices = cc )
-        updateSelectInput(session, 'p2', choices = cc, selected = cc[2] )
-        updateSelectInput(session, 'which', choices = colnames(colData(ddsTC))[1:2][colnames(colData(ddsTC))[1:2] != input$type] )
-        updateSelectInput(session, 'what', choices = levels(colData(ddsTC)[[input$which]]) )
+    sw <- observe({
+        if(is.null(rv$table)) return()
+        if(input$test == "Wald") {
+            cc <- levels(colData(ddsTC)[[input$type]])
+            updateSelectInput(session, 'p1', choices = cc, selected = head(cc, 1) )
+            updateSelectInput(session, 'p2', choices = cc, selected = tail(cc, 1) )
+        }
+        if(input$test == "Wald") {
+            wh <- colnames(colData(ddsTC))[1:2][colnames(colData(ddsTC))[1:2] != input$type]
+            updateSelectInput(session, 'which', choices = wh)
+        } else {
+            wh <- colnames(colData(ddsTC))[1:2]
+            updateSelectInput(session, 'which', choices = wh, selected=input$which)
+        }
         
-    }, priority = 10)
+        
+        ft <- levels(colData(ddsTC)[[input$which]])
+        info <- paste0("Use following [",input$which,"]:")
+        updateRadioButtons(session, 'what', label=info, choices = ft, selected=tail(ft, 1), inline=FALSE )
+        
+    })
 
     
     getResultTable <- reactive({
@@ -43,10 +55,10 @@ shinyServer(function(input, output, session) {
             progress <- shiny::Progress$new(session, min=0, max=3)
             on.exit(progress$close())
             
-            progress$set(message = 'Calculating statistical tests', value = 1,
-                         detail = 'This may take a while...')
+            progress$set(message = 'Initiating...', value = 0)
             
-            if(input$type == 'TS') {
+            if(input$test == 'asis') {
+                progress$set(message = 'Calculating TS', value = 1)
                 res <- results(ddsTC)
                 res$log2FoldChange <- res$lfcSE <- NA
                 rv$info <- paste0(
@@ -54,23 +66,48 @@ shinyServer(function(input, output, session) {
                     paste0(elementMetadata(res)[-(2:3),2], collapse='\n')
                 )
                 rv$dds <- ddsTC
+                
+            } else if(input$test == 'LRT') {
+                progress$set(message = 'Calculating statistical tests (LRT)', detail = 'This may take a while...', value = 1)
+                
+                dds <- ddsTC
+                design(dds) <- as.formula(input$m1)
+                dds <- DESeq(dds, test="LRT", reduced = as.formula(input$m0) )
+                
+                res <- results(dds)
+                res$log2FoldChange <- res$lfcSE <- NA
+                rv$info <- paste0(
+                    'Log2 Fold Change and its standard error available for paired tests only!\n', 
+                    paste0(elementMetadata(res)[-(2:3),2], collapse='\n')
+                )
+                rv$dds <- dds
+                
             } else {
                 if(input$filter) {
-                    dds <- ddsTC[,colData(ddsTC)[[input$which]] == input$what]
-                    design(dds)  <- as.formula(paste('~', input$type))
-                    dds <- DESeq(dds)
-                    rv$dds <- dds
+                    fn <- paste0('cache_', input$which, '_', input$what, '_', input$type, '.rda')
+                    if(file.exists(fn)) {
+                        progress$set(message = 'Loading from cache:', value = 1, detail=fn); message('Loading from cache: ', fn)
+                        rv$dds <- get(load(fn))
+                    } else {
+                        progress$set(message = 'Calculating statistical tests', value = 1, detail = 'This may take a while...')
+                        dds <- ddsTC[,colData(ddsTC)[[input$which]] == input$what]
+                        design(dds)  <- as.formula(paste('~', input$type))
+                        dds <- DESeq(dds)
+                        save(dds, file=fn)
+                        rv$dds <- dds
+                    }
                 } else {
                     dds <- ddsTC
                     rv$dds <- ddsTC
+                    
                 }
-                progress$set(message = 'Calculating tests results', value = 2)
+                
+                progress$set(message = 'Calculating Wald tests results', value = 2, detail=paste('Contrast: ', input$type, input$p1, input$p2))
                 res <- results(dds, contrast=c(input$type, input$p1, input$p2), test="Wald")
                 rv$info <- paste0(elementMetadata(res)[,2], collapse='\n')
             }
             
-            progress$set(message = 'Building result table', value = 3,
-                         detail = 'This may take a while...')
+            progress$set(message = 'Building result table', value = 3, detail = '')
             
             tab <- data.frame(
                 ID=rownames(res), 
@@ -100,7 +137,7 @@ shinyServer(function(input, output, session) {
     
         ")
         
-        btn <- JS('[
+        btn <- JS('[{"sExtends": "div", "sButtonClass": "button-label"},
             "copy", "csv", "xls", "pdf", "print",
             {"sExtends": "text", "sButtonText": "Select all visible", "fnClick": function ( node, conf ) {
                  this.fnSelectAll( true );

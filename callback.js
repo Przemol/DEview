@@ -26,3 +26,9 @@ table.columns().eq( 0 ).each( function ( colIdx ) {
         }
     } );
 } );
+
+$('.button-label').css('margin-left', '10px')
+$('.button-label').removeClass('DTTT_button')
+$('.button-label').addClass('label label-primary')
+$('.button-label').html('Visible/selected rows to:')
+$('.button-label').css('margin-right', '5px')

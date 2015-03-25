@@ -7,7 +7,7 @@ library(DT)
 shinyUI(fluidPage(
 
   # Application title
-  singleton(tags$script(type="text/javascript", src="js/colum_filter.js")),
+  singleton(tags$script(type="text/javascript", src="addons.js")),
   
   fluidRow(
       column(

@@ -26,4 +26,3 @@ table.columns().eq( 0 ).each( function ( colIdx ) {
         }
     } );
 } );
-            

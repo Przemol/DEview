@@ -5,7 +5,7 @@
   }
 },
 { "title": 'Gene' },
-
+{ "title": 'Seq ID' },
   { "title": '',
     "className": "table-center",
     "width": "1%",
@@ -21,8 +21,9 @@
     }
   },
 
+
 { "title": 'Base mean', type: "number-range" },
-{ "title": 'LogFC' },
+{ "title": 'Log FC' },
 { "title": 'FC std. error' },
 { "title": 'Statistic val' },
 { "title": 'p-value' },

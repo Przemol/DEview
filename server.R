@@ -1,26 +1,45 @@
 library(shiny)
-load('dssTC.Rdata')
+load('SE.Rdata')
 library(DESeq2)
 library(ggplot2)
+library(scales)
 library(DT)
 
 
 shinyServer(function(input, output, session) {
 
     rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL)
+    if(!file.exists("cache")) if(!dir.create('cache')) stop('FS is not writable.') else message('cache dir created') else message('cache OK')
     
     output$distPlot <- renderPlot({
         if(is.null(input$plot)) return()
         gene <- input$plot
         data <- plotCounts(rv$dds, gene, intgroup=c("stage","strain"), returnData=TRUE)
+        
+        if(input$plotType == 'fpm') data$count <- fpm(rv$dds)[gene,]
+        if(input$plotType == 'fpkm') data$count <- fpkm(rv$dds)[gene,]
+
         info <- sapply(mcols(rv$dds[gene,])[,1:2], as.character)
         #bm <- round( mcols(rv$dds[gene,])[,3], 2) 
         g <- ggplot(data, aes(x=stage, y=count, color=strain, group=strain)) + 
-            geom_point() + scale_y_log10() +
+            geom_point() +
             stat_smooth(se=FALSE,method="loess", size = 1.3) +
             ggtitle(paste0(
                 info[1],  ' (', gene, ')\n ', info[2] #, '\n FDR=', res[gene,]$padj, '; BM=', bm
             ))
+        
+        if(input$plotScale == 'N') g <- g + scale_y_continuous(breaks=pretty_breaks(n=10))
+        
+        if(input$plotScale == 'log10') g <- g + scale_y_continuous(
+            trans = 'log10',
+            breaks = trans_breaks('log10', function(x) 10^x, n=10),
+            labels = trans_format('log10', math_format(10^.x))
+        )
+        
+        if(input$plotScale == 'log2') g <- g + scale_y_continuous(
+            trans = log2_trans(), n=10,
+            breaks = trans_breaks('log2', function(x) 2^x), labels = trans_format('log2', math_format(2^.x)))
+        
         rv$plot <- g
         g
         
@@ -30,20 +49,20 @@ shinyServer(function(input, output, session) {
     sw <- observe({
         if(is.null(rv$table)) return()
         if(input$test == "Wald") {
-            cc <- levels(colData(ddsTC)[[input$type]])
+            cc <- levels(colData(SE)[[input$type]])
             updateSelectInput(session, 'p1', choices = cc, selected = head(cc, 1) )
             updateSelectInput(session, 'p2', choices = cc, selected = tail(cc, 1) )
         }
         if(input$test == "Wald") {
-            wh <- colnames(colData(ddsTC))[1:2][colnames(colData(ddsTC))[1:2] != input$type]
+            wh <- colnames(colData(SE))[1:2][colnames(colData(SE))[1:2] != input$type]
             updateSelectInput(session, 'which', choices = wh)
         } else {
-            wh <- colnames(colData(ddsTC))[1:2]
+            wh <- colnames(colData(SE))[1:2]
             updateSelectInput(session, 'which', choices = wh, selected=input$which)
         }
         
         
-        ft <- levels(colData(ddsTC)[[input$which]])
+        ft <- levels(colData(SE)[[input$which]])
         info <- paste0("Use following [",input$which,"]:")
         updateRadioButtons(session, 'what', label=info, choices = ft, selected=tail(ft, 1), inline=FALSE )
         
@@ -59,20 +78,40 @@ shinyServer(function(input, output, session) {
             
             if(input$test == 'asis') {
                 progress$set(message = 'Calculating TS', value = 1)
+                load('ddsTC.Rdata')
                 res <- results(ddsTC)
                 res$log2FoldChange <- res$lfcSE <- NA
                 rv$info <- paste0(
                     'Log2 Fold Change and its standard error available for paired tests only!\n', 
                     paste0(elementMetadata(res)[-(2:3),2], collapse='\n')
                 )
-                rv$dds <- ddsTC
+                rv$dds <- dds <- ddsTC
                 
             } else if(input$test == 'LRT') {
-                progress$set(message = 'Calculating statistical tests (LRT)', detail = 'This may take a while...', value = 1)
                 
-                dds <- ddsTC
-                design(dds) <- as.formula(input$m1)
-                dds <- DESeq(dds, test="LRT", reduced = as.formula(input$m0) )
+                
+                fltstring <- if(input$filter) paste0(input$which, '_', input$what) else 'AllData'
+                
+                fn <- file.path('cache', paste0(
+                    'cache_LTR_', fltstring, '_', 
+                    paste(as.character(as.formula(input$m1)), collapse=''), '_',
+                    paste(as.character(as.formula(input$m0)), collapse=''), '.rda'
+                ))
+                
+                if(file.exists(fn)) {
+                    progress$set(message = 'Loading from cache:', value = 1, detail=fn); message('Loading from cache: ', fn)
+                    rv$dds <- dds <- get(load(fn))
+                } else {
+                    progress$set(message = 'Calculating statistical tests (LRT)', detail = 'This may take a while...', value = 1)
+                    if(input$filter) {
+                        dds <-DESeqDataSet(SE[,colData(SE)[[input$which]] == input$what], design = as.formula(input$m1) )
+                    } else {
+                        dds <-DESeqDataSet(SE, design = as.formula(input$m1) )
+                    }
+                    design(dds) <- as.formula(input$m1)
+                    rv$dds <- dds <- DESeq(dds, test="LRT", reduced = as.formula(input$m0) )
+                    save(dds, file=fn)
+                }
                 
                 res <- results(dds)
                 res$log2FoldChange <- res$lfcSE <- NA
@@ -80,26 +119,25 @@ shinyServer(function(input, output, session) {
                     'Log2 Fold Change and its standard error available for paired tests only!\n', 
                     paste0(elementMetadata(res)[-(2:3),2], collapse='\n')
                 )
-                rv$dds <- dds
                 
             } else {
-                if(input$filter) {
-                    fn <- paste0('cache_', input$which, '_', input$what, '_', input$type, '.rda')
-                    if(file.exists(fn)) {
-                        progress$set(message = 'Loading from cache:', value = 1, detail=fn); message('Loading from cache: ', fn)
-                        rv$dds <- get(load(fn))
-                    } else {
-                        progress$set(message = 'Calculating statistical tests', value = 1, detail = 'This may take a while...')
-                        dds <- ddsTC[,colData(ddsTC)[[input$which]] == input$what]
-                        design(dds)  <- as.formula(paste('~', input$type))
-                        dds <- DESeq(dds)
-                        save(dds, file=fn)
-                        rv$dds <- dds
-                    }
+                
+                fn <- file.path('cache', paste0('cache_Wald_', input$which, '_', input$what, '_', input$type, '.rda'))
+                if(file.exists(fn)) {
+                    progress$set(message = 'Loading from cache:', value = 1, detail=fn); message('Loading from cache: ', fn)
+                    rv$dds <- get(load(fn))
                 } else {
-                    dds <- ddsTC
-                    rv$dds <- ddsTC
-                    
+                    progress$set(message = 'Calculating statistical tests', value = 1, detail = 'This may take a while...')
+                    if(input$filter) {
+                        dds <- DESeqDataSet(
+                            SE[,colData(SE)[[input$which]] == input$what], 
+                            design = as.formula(paste('~', input$type))
+                        )
+                    } else {
+                        dds <- DESeqDataSet(SE, design = as.formula(paste('~', input$type))) 
+                    }
+                    rv$dds <- dds <- DESeq(dds)
+                    save(dds, file=fn)
                 }
                 
                 progress$set(message = 'Calculating Wald tests results', value = 2, detail=paste('Contrast: ', input$type, input$p1, input$p2))
@@ -111,8 +149,10 @@ shinyServer(function(input, output, session) {
             
             tab <- data.frame(
                 ID=rownames(res), 
-                gene=as.character(mcols(ddsTC)$geneName),
-                info=as.character(mcols(ddsTC)$desc),
+                gene=as.character(mcols(dds)$geneName),
+                
+                seqID=if(length(mcols(dds)$seqID)) as.character(mcols(dds)$seqID) else "",
+                info=as.character(mcols(dds)$desc),
                 as.data.frame(res), 
                 Plot=NA,
                 stringsAsFactors = FALSE
@@ -139,7 +179,7 @@ shinyServer(function(input, output, session) {
         
         btn <- JS('[{"sExtends": "div", "sButtonClass": "button-label"},
             "copy", "csv", "xls", "pdf", "print",
-            {"sExtends": "text", "sButtonText": "Select all visible", "fnClick": function ( node, conf ) {
+            {"sExtends": "text", "sButtonText": "Sel. all", "fnClick": function ( node, conf ) {
                  this.fnSelectAll( true );
                  alert("Total selections: "+ this.fnGetSelectedData().length +" rows!");
                } }, "select_none"
@@ -149,7 +189,7 @@ shinyServer(function(input, output, session) {
             rv$table, 
             server = TRUE, 
             rownames = FALSE,
-            extensions = c('TableTools'),
+            extensions = c('TableTools', 'ColReorder', 'ColVis'),
             container = sketch,
             callback = JS(readLines('callback.js')),,
             options = list(
@@ -159,11 +199,13 @@ shinyServer(function(input, output, session) {
                 deferRender = TRUE,
                 scrollY = 385,
                 
-                order=JS('[[ 7, "asc" ]]'),
+                colReorder = list(realtime = TRUE),
+                
+                order=JS('[[ 9, "asc" ]]'),
                 pageLength = 10,
                 lengthMenu=JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
                 columns = JS(readLines('colDef.js')),
-                dom = 'T<"clear">lfrtip',
+                dom = 'RCT<"clear">lfrtip',
                 tableTools = list(aButtons=btn, sRowSelect="os", sSwfPath = copySWF(dest='www', pdf = TRUE)),
                 #fnServerParams= JS("function(params) {Shiny.shinyapp.sendInput({sel:this.DataTable().ajax.params()});}"),
                 ajax = list(
@@ -171,7 +213,7 @@ shinyServer(function(input, output, session) {
                     type = 'POST'
                 )
             )
-        )  %>% formatRound(4:7, 2)    
+        )  %>% formatRound(5:8, 2)
         
     })
 
@@ -191,7 +233,12 @@ shinyServer(function(input, output, session) {
             paste('DEview_data_', gsub(' ', '_', Sys.time()), '.csv', sep='')
         },
         content = function(con) {
-            write.csv(rv$table[,-ncol(rv$table)], con, row.names = FALSE)
+            out <- rv$table[,-ncol(rv$table)]
+            if('R' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=FALSE))
+            if('NR' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=TRUE))
+            if('RPM' %in% input$add) out <- cbind(out, fpm(rv$dds))
+            if('RPKM' %in% input$add) out <- cbind(out, fpkm(rv$dds))
+            write.csv(out, con, row.names = FALSE)
         }
     )
     
@@ -263,7 +310,12 @@ shinyServer(function(input, output, session) {
 #             message(length(s))
 #             message(length(input$data_rows_current))
             out <- getFLT(rv$table, input$sel)
-            write.csv(out[, -ncol(rv$table), drop = FALSE], file, row.names = FALSE)
+            out <- out[, -ncol(rv$table), drop = FALSE]
+            if('R' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=FALSE))
+            if('NR' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=TRUE))
+            if('RPM' %in% input$add) out <- cbind(out, fpm(rv$dds))
+            if('RPKM' %in% input$add) out <- cbind(out, fpkm(rv$dds))
+            write.csv(out, con, row.names = FALSE)
         }
     )
 # 

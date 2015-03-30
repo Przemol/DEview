@@ -11,16 +11,34 @@ shinyServer(function(input, output, session) {
     rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL)
     if(!file.exists("cache")) if(!dir.create('cache')) stop('FS is not writable.') else message('cache dir created') else message('cache OK')
     
+    observe({
+ 
+    })
+    
     output$distPlot <- renderPlot({
         if(is.null(input$plot)) return()
         gene <- input$plot
-        data <- plotCounts(rv$dds, gene, intgroup=c("stage","strain"), returnData=TRUE)
         
-        if(input$plotType == 'fpm') data$count <- fpm(rv$dds)[gene,]
-        if(input$plotType == 'fpkm') data$count <- fpkm(rv$dds)[gene,]
+        
+        if(input$plotValues=='a') {
+            message('plotsetsetup')
+            rv$plotset <- DESeqDataSet(SE, ~ stage + strain)
+        } else if (input$plotValues=='f') {
+            rv$plotset <- rv$dds
+        } else {
+            message('plotsetsetup')
+            inc <- (colData(SE)[[1]] %in% input$plotValues_f1) & (colData(SE)[[2]] %in% input$plotValues_f2)
+            rv$plotset <- DESeqDataSet( SE[,inc], ~1 )
+        }
+        
+        plotset <- rv$plotset
+        
+        data <- plotCounts(plotset, gene, intgroup=c("stage","strain"), returnData=TRUE)
+        if(input$plotType == 'fpm') data$count <- fpm(plotset)[gene,]
+        if(input$plotType == 'fpkm') data$count <- fpkm(plotset)[gene,]
 
-        info <- sapply(mcols(rv$dds[gene,])[,1:2], as.character)
-        #bm <- round( mcols(rv$dds[gene,])[,3], 2) 
+        info <- sapply(mcols(plotset[gene,])[,1:2], as.character)
+        #bm <- round( mcols(plotset[gene,])[,3], 2) 
         g <- ggplot(data, aes(x=stage, y=count, color=strain, group=strain)) + 
             geom_point() +
             stat_smooth(se=FALSE,method="loess", size = 1.3) +
@@ -33,12 +51,16 @@ shinyServer(function(input, output, session) {
         if(input$plotScale == 'log10') g <- g + scale_y_continuous(
             trans = 'log10',
             breaks = trans_breaks('log10', function(x) 10^x, n=10),
-            labels = trans_format('log10', math_format(10^.x))
+            #labels = trans_format('log10', math_format(10^.x))
+            labels = round
         )
+
         
         if(input$plotScale == 'log2') g <- g + scale_y_continuous(
-            trans = log2_trans(), n=10,
-            breaks = trans_breaks('log2', function(x) 2^x), labels = trans_format('log2', math_format(2^.x)))
+            trans = log2_trans(), 
+            breaks = trans_breaks('log2', function(x) 2^x, n=10)
+            #labels = trans_format('log2', math_format(2^.x))
+        )
         
         rv$plot <- g
         g
@@ -50,8 +72,8 @@ shinyServer(function(input, output, session) {
         if(is.null(rv$table)) return()
         if(input$test == "Wald") {
             cc <- levels(colData(SE)[[input$type]])
-            updateSelectInput(session, 'p1', choices = cc, selected = head(cc, 1) )
-            updateSelectInput(session, 'p2', choices = cc, selected = tail(cc, 1) )
+            updateRadioButtons(session, 'p1', label=paste0('[', input$type,']'), choices = cc, selected = head(cc, 1) )
+            updateRadioButtons(session, 'p2', choices = cc, selected = tail(cc, 1) )
         }
         if(input$test == "Wald") {
             wh <- colnames(colData(SE))[1:2][colnames(colData(SE))[1:2] != input$type]
@@ -122,7 +144,9 @@ shinyServer(function(input, output, session) {
                 
             } else {
                 
-                fn <- file.path('cache', paste0('cache_Wald_', input$which, '_', input$what, '_', input$type, '.rda'))
+                fltstring <- if(input$filter) paste0(input$which, '_', input$what) else 'AllData'
+                fn <- file.path('cache', paste0('cache_Wald_', fltstring, '_', input$type, '.rda'))
+                
                 if(file.exists(fn)) {
                     progress$set(message = 'Loading from cache:', value = 1, detail=fn); message('Loading from cache: ', fn)
                     rv$dds <- get(load(fn))
@@ -236,8 +260,8 @@ shinyServer(function(input, output, session) {
             out <- rv$table[,-ncol(rv$table)]
             if('R' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=FALSE))
             if('NR' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=TRUE))
-            if('RPM' %in% input$add) out <- cbind(out, fpm(rv$dds))
-            if('RPKM' %in% input$add) out <- cbind(out, fpkm(rv$dds))
+            #if('RPM' %in% input$add) out <- cbind(out, fpm(rv$dds))
+            if('RPKM' %in% input$add) out <- cbind(out, fpkm(rv$dds, robust = FALSE))
             write.csv(out, con, row.names = FALSE)
         }
     )
@@ -305,7 +329,7 @@ shinyServer(function(input, output, session) {
         filename = function() {
             paste('DEview_data_', gsub(' ', '_', Sys.time()), '.csv', sep='')
         },
-        content = function(file) {
+        content = function(con) {
 #             s = input$selected
 #             message(length(s))
 #             message(length(input$data_rows_current))

@@ -30,19 +30,19 @@ shinyUI(fluidPage(
                     radioButtons(
                         inputId = 'type', 
                         label = 'Compare', 
-                        choices = c(colnames(colData(SE))[1:2]),
-                        selected = 'stage'
+                        choices = colnames(colData(SE))[1:2],
+                        selected = colnames(colData(SE))[2]
                     )
                 ), div(class='col-md-3',
-                       radioButtons('p1', '[strain]', levels(colData(SE)[['stage']]), selected=head(levels(colData(SE)[['stage']]), 1))
+                       radioButtons('p1', paste0('[',colnames(colData(SE))[2],']'), levels(colData(SE)[[2]]), selected=head(levels(colData(SE)[[2]]), 1))
                 ), div(class='col-md-3',
-                       radioButtons('p2', 'versus', levels(colData(SE)[['stage']]), selected=tail(levels(colData(SE)[['stage']]), 1))
+                       radioButtons('p2', 'versus', levels(colData(SE)[[2]]), selected=tail(levels(colData(SE)[[2]]), 1))
                 ))
             ),
             
             conditionalPanel(
                 condition = 'input.test == "LRT"',
-                textInput('m1', 'Model formula', '~ stage'),
+                textInput('m1', 'Model formula', paste0('~ ', colnames(colData(SE))[2] )),
                 textInput('m0', 'Reduced formula to compare against', '~ 1')
                 
             ),
@@ -53,9 +53,9 @@ shinyUI(fluidPage(
                 condition = 'input.filter',
                 conditionalPanel(
                     condition = 'input.test == "LRT"', 
-                    selectInput('which', 'Which value filter on', colnames(colData(SE))[1:2], selected = 'strain')
+                    selectInput('which', 'Which value filter on', colnames(colData(SE))[1:2], selected = colnames(colData(SE))[1])
                 ),
-                radioButtons('what', 'Use following [strain]:', levels(colData(SE)[['strain']]), selected = 'N2', inline=FALSE)
+                radioButtons('what', paste0('Use following [',colnames(colData(SE))[1],']'), levels(colData(SE)[[1]]), selected = 'N2', inline=FALSE)
             ),
             
             actionButton(inputId = 'apply', label = 'Apply settings', class='btn-success')

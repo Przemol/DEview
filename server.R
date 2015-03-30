@@ -69,7 +69,7 @@ shinyServer(function(input, output, session) {
     })
     
     sw <- observe({
-        if(is.null(rv$table)) return()
+        #if(is.null(rv$table)) return()
         if(input$test == "Wald") {
             cc <- levels(colData(SE)[[input$type]])
             updateRadioButtons(session, 'p1', label=paste0('[', input$type,']'), choices = cc, selected = head(cc, 1) )

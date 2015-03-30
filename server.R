@@ -22,7 +22,7 @@ shinyServer(function(input, output, session) {
         
         if(input$plotValues=='a') {
             message('plotsetsetup')
-            rv$plotset <- DESeqDataSet(SE, ~ stage + strain)
+            rv$plotset <- DESeqDataSet(SE, ~ 1)
         } else if (input$plotValues=='f') {
             rv$plotset <- rv$dds
         } else {
@@ -173,10 +173,10 @@ shinyServer(function(input, output, session) {
             
             tab <- data.frame(
                 ID=rownames(res), 
-                gene=as.character(mcols(dds)$geneName),
+                gene=if(length(mcols(dds)$geneName)) as.character(mcols(dds)$geneName) else "",
                 
                 seqID=if(length(mcols(dds)$seqID)) as.character(mcols(dds)$seqID) else "",
-                info=as.character(mcols(dds)$desc),
+                info=if(length(mcols(dds)$desc)) as.character(mcols(dds)$desc)else "",
                 as.data.frame(res), 
                 Plot=NA,
                 stringsAsFactors = FALSE
@@ -356,6 +356,15 @@ shinyServer(function(input, output, session) {
 #         )
 #     )
 # })
+
+output$design <- DT::renderDataTable({
+    #tmp <- if(input$desall) SE else SE[,colData(SE)[[input$which]] == input$what]
+    des <- as.data.frame(colData(SE))
+    rownames(des) <- 1:nrow(des)
+    if(!input$desall) des <- des[des[[input$which]] == input$what,]
+
+    datatable(des, rownames = TRUE)
+})
 
 output$debug_out <- renderPrint({
     if(input$debug_submit==0) return()

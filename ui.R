@@ -57,8 +57,8 @@ shinyUI(fluidPage(
                 ),
                 radioButtons('what', paste0('Use following [',colnames(colData(SE))[1],']'), levels(colData(SE)[[1]]), selected = 'N2', inline=FALSE)
             ),
-            
             actionButton(inputId = 'apply', label = 'Apply settings', class='btn-success')
+            
             ), tabPanel(
                 'Outputs/plot optins',
                 checkboxGroupInput('add', 'Add to CSV', list('Raw counts'='R', 'Normalized counts'='NR', 'Robust RPKM'='RPKM'), inline = TRUE),
@@ -86,6 +86,10 @@ shinyUI(fluidPage(
                 checkboxInput('debug', 'Debug console'),
                 checkboxInput('advstat', 'Enable advanced stats options')
             
+            ), tabPanel(
+                "Data and design",
+                DT::dataTableOutput("design"),
+                checkboxInput('desall', 'Show all')
             ))
         ),
         column(

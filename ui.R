@@ -1,5 +1,5 @@
 library(shiny)
-load('SE.Rdata')
+load('SE_Fan.Rdata')
 library(DESeq2)
 library(ggplot2)
 library(DT)
@@ -89,9 +89,10 @@ shinyUI(fluidPage(
             ), tabPanel(
                 "Data and design",
                 DT::dataTableOutput("design"),
-                checkboxInput('desall', 'Show all'),
+                checkboxInput('desall', 'Show all')
+                #,
                 
-                selectInput('dataset', 'Dataset', dir('data'))
+                #selectInput('dataset', 'Dataset', dir('data'))
             ))
         ),
         column(

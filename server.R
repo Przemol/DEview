@@ -1,5 +1,5 @@
 library(shiny)
-load('SE.Rdata')
+load('SE_Fan.Rdata')
 library(DESeq2)
 library(ggplot2)
 library(scales)
@@ -8,12 +8,14 @@ library(DT)
 
 shinyServer(function(input, output, session) {
 
-    rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL)
+    rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL, SE=SE)
     if(!file.exists("cache")) if(!dir.create('cache')) stop('FS is not writable.') else message('cache dir created') else message('cache OK')
     
     observe({
-        message('loading: ', input$dataset)
-        rv$SE <- get(load(file.path('data', input$dataset)))
+        #message('loading: ', input$dataset)
+        #rv$SE <- get(load(file.path('data', input$dataset)))
+        #rv$SE <- SE
+        #updateRadioButtons(session, 'type', choices = colnames(colData(rv$SE))[1:2], selected = colnames(colData(rv$SE))[2])
     })
     
     output$distPlot <- renderPlot({
@@ -23,18 +25,18 @@ shinyServer(function(input, output, session) {
         
         if(input$plotValues=='a') {
             message('plotsetsetup')
-            rv$plotset <- DESeqDataSet(SE, ~ 1)
+            rv$plotset <- DESeqDataSet(rv$SE, ~ 1)
         } else if (input$plotValues=='f') {
             rv$plotset <- rv$dds
         } else {
             message('plotsetsetup')
-            inc <- (colData(SE)[[1]] %in% input$plotValues_f1) & (colData(SE)[[2]] %in% input$plotValues_f2)
-            rv$plotset <- DESeqDataSet( SE[,inc], ~1 )
+            inc <- (colData(rv$SE)[[1]] %in% input$plotValues_f1) & (colData(rv$SE)[[2]] %in% input$plotValues_f2)
+            rv$plotset <- DESeqDataSet( rv$SE[,inc], ~1 )
         }
         
         plotset <- rv$plotset
-        intgroups <- colnames(colData(SE))
-        group <- parse(text = intgroups[intgroups!='stage'])
+        intgroups <- colnames(colData(rv$SE))
+        
         
         data <- plotCounts(plotset, gene, intgroup=intgroups, returnData=TRUE)
         if(input$plotType == 'fpm') data$count <- fpm(plotset)[gene,]
@@ -42,8 +44,10 @@ shinyServer(function(input, output, session) {
         
         info <- sapply(mcols(plotset[gene,])[,1:2], as.character)
         #bm <- round( mcols(plotset[gene,])[,3], 2) 
-        g <- ggplot(data, aes( x=stage, y=count, color=eval(group), group=eval(group) )) + 
-            geom_point() + guides(color=guide_legend(title=intgroups[intgroups!='stage'])) +
+        secondGroup <- intgroups[intgroups!='stage']
+        
+        g <- ggplot(data, aes_string( x="stage", y="count", color=secondGroup, group=secondGroup )) + 
+            geom_point() + guides(color=guide_legend(title=secondGroup)) +
             stat_smooth(se=FALSE,method="loess", size = 1.3) +
             ggtitle(paste0(
                 info[1],  ' (', gene, ')\n ', info[2] #, '\n FDR=', res[gene,]$padj, '; BM=', bm
@@ -73,21 +77,22 @@ shinyServer(function(input, output, session) {
     
     sw <- observe({
         #if(is.null(rv$table)) return()
+        
         if(input$test == "Wald") {
-            cc <- levels(colData(SE)[[input$type]])
+            cc <- levels(colData(rv$SE)[[input$type]])
             updateRadioButtons(session, 'p1', label=paste0('[', input$type,']'), choices = cc, selected = head(cc, 1) )
             updateRadioButtons(session, 'p2', choices = cc, selected = tail(cc, 1) )
         }
         if(input$test == "Wald") {
-            wh <- colnames(colData(SE))[1:2][colnames(colData(SE))[1:2] != input$type]
+            wh <- colnames(colData(rv$SE))[1:2][colnames(colData(rv$SE))[1:2] != input$type]
             updateSelectInput(session, 'which', choices = wh)
         } else {
-            wh <- colnames(colData(SE))[1:2]
+            wh <- colnames(colData(rv$SE))[1:2]
             updateSelectInput(session, 'which', choices = wh, selected=input$which)
         }
         
         
-        ft <- levels(colData(SE)[[input$which]])
+        ft <- levels(colData(rv$SE)[[input$which]])
         info <- paste0("Use following [",input$which,"]:")
         updateRadioButtons(session, 'what', label=info, choices = ft, selected=head(ft, 1), inline=FALSE )
         
@@ -129,9 +134,9 @@ shinyServer(function(input, output, session) {
                 } else {
                     progress$set(message = 'Calculating statistical tests (LRT)', detail = 'This may take a while...', value = 1)
                     if(input$filter) {
-                        dds <-DESeqDataSet(SE[,colData(SE)[[input$which]] == input$what], design = as.formula(input$m1) )
+                        dds <-DESeqDataSet(rv$SE[,colData(rv$SE)[[input$which]] == input$what], design = as.formula(input$m1) )
                     } else {
-                        dds <-DESeqDataSet(SE, design = as.formula(input$m1) )
+                        dds <-DESeqDataSet(rv$SE, design = as.formula(input$m1) )
                     }
                     design(dds) <- as.formula(input$m1)
                     rv$dds <- dds <- DESeq(dds, test="LRT", reduced = as.formula(input$m0) )
@@ -157,11 +162,11 @@ shinyServer(function(input, output, session) {
                     progress$set(message = 'Calculating statistical tests', value = 1, detail = 'This may take a while...')
                     if(input$filter) {
                         dds <- DESeqDataSet(
-                            SE[,colData(SE)[[input$which]] == input$what], 
+                            rv$SE[,colData(rv$SE)[[input$which]] == input$what], 
                             design = as.formula(paste('~', input$type))
                         )
                     } else {
-                        dds <- DESeqDataSet(SE, design = as.formula(paste('~', input$type))) 
+                        dds <- DESeqDataSet(rv$SE, design = as.formula(paste('~', input$type))) 
                     }
                     rv$dds <- dds <- DESeq(dds)
                     save(dds, file=fn)
@@ -362,7 +367,7 @@ shinyServer(function(input, output, session) {
 
 output$design <- DT::renderDataTable({
     #tmp <- if(input$desall) SE else SE[,colData(SE)[[input$which]] == input$what]
-    des <- as.data.frame(colData(SE))
+    des <- as.data.frame(colData(rv$SE))
     rownames(des) <- 1:nrow(des)
     if(!input$desall) des <- des[des[[input$which]] == input$what,]
 

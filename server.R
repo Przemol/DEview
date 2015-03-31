@@ -12,7 +12,8 @@ shinyServer(function(input, output, session) {
     if(!file.exists("cache")) if(!dir.create('cache')) stop('FS is not writable.') else message('cache dir created') else message('cache OK')
     
     observe({
- 
+        message('loading: ', input$dataset)
+        rv$SE <- get(load(file.path('data', input$dataset)))
     })
     
     output$distPlot <- renderPlot({
@@ -32,15 +33,17 @@ shinyServer(function(input, output, session) {
         }
         
         plotset <- rv$plotset
+        intgroups <- colnames(colData(SE))
+        group <- parse(text = intgroups[intgroups!='stage'])
         
-        data <- plotCounts(plotset, gene, intgroup=c("stage","strain"), returnData=TRUE)
+        data <- plotCounts(plotset, gene, intgroup=intgroups, returnData=TRUE)
         if(input$plotType == 'fpm') data$count <- fpm(plotset)[gene,]
         if(input$plotType == 'fpkm') data$count <- fpkm(plotset)[gene,]
-
+        
         info <- sapply(mcols(plotset[gene,])[,1:2], as.character)
         #bm <- round( mcols(plotset[gene,])[,3], 2) 
-        g <- ggplot(data, aes(x=stage, y=count, color=strain, group=strain)) + 
-            geom_point() +
+        g <- ggplot(data, aes( x=stage, y=count, color=eval(group), group=eval(group) )) + 
+            geom_point() + guides(color=guide_legend(title=intgroups[intgroups!='stage'])) +
             stat_smooth(se=FALSE,method="loess", size = 1.3) +
             ggtitle(paste0(
                 info[1],  ' (', gene, ')\n ', info[2] #, '\n FDR=', res[gene,]$padj, '; BM=', bm
@@ -86,7 +89,7 @@ shinyServer(function(input, output, session) {
         
         ft <- levels(colData(SE)[[input$which]])
         info <- paste0("Use following [",input$which,"]:")
-        updateRadioButtons(session, 'what', label=info, choices = ft, selected=tail(ft, 1), inline=FALSE )
+        updateRadioButtons(session, 'what', label=info, choices = ft, selected=head(ft, 1), inline=FALSE )
         
     })
 

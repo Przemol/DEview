@@ -55,7 +55,7 @@ shinyUI(fluidPage(
                     condition = 'input.test == "LRT"', 
                     selectInput('which', 'Which value filter on', colnames(colData(SE))[1:2], selected = colnames(colData(SE))[1])
                 ),
-                radioButtons('what', paste0('Use following [',colnames(colData(SE))[1],']'), levels(colData(SE)[[1]]), selected = 'N2', inline=FALSE)
+                radioButtons('what', paste0('Use following [',colnames(colData(SE))[1],']'), levels(colData(SE)[[1]]), selected = levels(colData(SE)[[1]])[1], inline=FALSE)
             ),
             actionButton(inputId = 'apply', label = 'Apply settings', class='btn-success')
             
@@ -89,7 +89,9 @@ shinyUI(fluidPage(
             ), tabPanel(
                 "Data and design",
                 DT::dataTableOutput("design"),
-                checkboxInput('desall', 'Show all')
+                checkboxInput('desall', 'Show all'),
+                
+                selectInput('dataset', 'Dataset', dir('data'))
             ))
         ),
         column(

@@ -31,7 +31,7 @@ shinyUI(fluidPage(
             conditionalPanel(condition = 'input.advstat', selectInput(
                 inputId = 'test',
                 label = 'Statistical test', 
-                choices = list('Wald (pairwise comparison)'="Wald", "Likelihood-ratio test (model comparison)"='LRT', "Default results from DEseq file"='asis')
+                choices = list('Wald (pairwise comparison)'="Wald", "Likelihood-ratio test (model comparison)"='LRT')
             )), 
             conditionalPanel(
                 condition = 'input.test == "Wald"',

@@ -396,8 +396,11 @@ output$dlfile <- downloadHandler(input$SEdata, content = function(x) {
 
 observe({
     if(input$rmfile == 0) return()
-    file.remove(file.path('data', input$SEdata))
-    updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
+    isolate({
+        file.remove(file.path('data', input$SEdata))
+        file.remove(file.path('cache', dir('cache', pattern=paste0(sub('\\.', '_', input$SEdata), '_cache'))))
+        updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
+    })
 }) 
 
 })

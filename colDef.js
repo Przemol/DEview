@@ -23,8 +23,9 @@
 
 
 { "title": 'Base mean', type: "number-range" },
-{ "title": 'Log FC' },
-{ "title": 'FC std. error' },
+{ "title": 'MAP FC' },
+{ "title": 'LogFC' },
+{ "title": 'FC error' },
 { "title": 'Statistic val' },
 { "title": 'p-value' },
 { "title": 'FDR' },

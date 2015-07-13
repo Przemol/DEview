@@ -23,7 +23,7 @@ shinyUI(fluidPage(
             ), div(class='col-md-3',
                    shiny::fileInput('newfile', 'Add')
             ), div(class='col-md-1',
-                   tags$br(), shiny::actionButton('dlfile', '', icon = icon('download'), class='btn btn-success btn-sm', position='middle')
+                   tags$br(), shiny::downloadButton('dlfile', '', class='btn btn-success btn-sm')
             ), div(class='col-md-1',
                    tags$br(), shiny::actionButton('rmfile', '', icon = icon('remove'), class='btn btn-danger btn-sm', position='middle')
             )),

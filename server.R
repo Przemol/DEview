@@ -4,6 +4,7 @@ library(ggplot2)
 library(scales)
 library(DT)
 
+options("shiny.maxRequestSize" = -1)
 
 shinyServer(function(input, output, session) {
 
@@ -128,7 +129,7 @@ shinyServer(function(input, output, session) {
                 ))
                 
                 if(file.exists(fn)) {
-                    progress$set(message = 'Loading from cache:', value = 1, detail=fn); message('Loading from cache: ', fn)
+                    progress$set(message = 'Loading from cache', value = 1, detail=""); message('Loading from cache: ', fn)
                     rv$dds <- dds <- get(load(fn))
                 } else {
                     progress$set(message = 'Calculating statistical tests (LRT)', detail = 'This may take a while...', value = 1)
@@ -158,7 +159,7 @@ shinyServer(function(input, output, session) {
                 )
                 
                 if(file.exists(fn)) {
-                    progress$set(message = 'Loading from cache:', value = 1, detail=fn); message('Loading from cache: ', fn)
+                    progress$set(message = 'Loading from cache', value = 1, detail=''); message('Loading from cache: ', fn)
                     rv$dds <- get(load(fn))
                 } else {
                     progress$set(message = 'Calculating statistical tests', value = 1, detail = 'This may take a while...')
@@ -386,6 +387,16 @@ output$debug_out <- renderPrint({
    
 observe({
     file.copy(input$newfile$datapath, file.path('data', input$newfile$name))
+    updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
+}) 
+
+output$dlfile <- downloadHandler(input$SEdata, content = function(x) { 
+    file.copy(file.path('data', input$SEdata), x) 
+})
+
+observe({
+    if(input$rmfile == 0) return()
+    file.remove(file.path('data', input$SEdata))
     updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
 }) 
 

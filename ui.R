@@ -1,5 +1,4 @@
 library(shiny)
-load('SE_Fan.Rdata')
 library(DESeq2)
 library(ggplot2)
 library(DT)
@@ -19,6 +18,16 @@ shinyUI(fluidPage(
                 plotOutput("distPlot")
             ),
             tabsetPanel(type = 'tabs', position = 'above', tabPanel('Statistical test',
+            div(class='row', div(class='col-md-6',
+                selectInput('SEdata', 'Dataset', choices = dir('data') )
+            ), div(class='col-md-3',
+                   shiny::fileInput('newfile', 'Add')
+            ), div(class='col-md-1',
+                   tags$br(), shiny::actionButton('dlfile', '', icon = icon('download'), class='btn btn-success btn-sm', position='middle')
+            ), div(class='col-md-1',
+                   tags$br(), shiny::actionButton('rmfile', '', icon = icon('remove'), class='btn btn-danger btn-sm', position='middle')
+            )),
+            
             conditionalPanel(condition = 'input.advstat', selectInput(
                 inputId = 'test',
                 label = 'Statistical test', 
@@ -30,19 +39,18 @@ shinyUI(fluidPage(
                     radioButtons(
                         inputId = 'type', 
                         label = 'Compare', 
-                        choices = colnames(colData(SE))[1:2],
-                        selected = colnames(colData(SE))[2]
+                        choices = ""
                     )
                 ), div(class='col-md-3',
-                       radioButtons('p1', paste0('[',colnames(colData(SE))[2],']'), levels(colData(SE)[[2]]), selected=head(levels(colData(SE)[[2]]), 1))
+                       radioButtons('p1', paste0('[',']'), "")
                 ), div(class='col-md-3',
-                       radioButtons('p2', 'versus', levels(colData(SE)[[2]]), selected=tail(levels(colData(SE)[[2]]), 1))
+                       radioButtons('p2', 'versus', "")
                 ))
             ),
             
             conditionalPanel(
                 condition = 'input.test == "LRT"',
-                textInput('m1', 'Model formula', paste0('~ ', colnames(colData(SE))[2] )),
+                textInput('m1', 'Model formula', paste0('~ ', "strain" )),
                 textInput('m0', 'Reduced formula to compare against', '~ 1')
                 
             ),
@@ -53,9 +61,9 @@ shinyUI(fluidPage(
                 condition = 'input.filter',
                 conditionalPanel(
                     condition = 'input.test == "LRT"', 
-                    selectInput('which', 'Which value filter on', colnames(colData(SE))[1:2], selected = colnames(colData(SE))[1])
+                    selectInput('which', 'Which value filter on', "")
                 ),
-                radioButtons('what', paste0('Use following [',colnames(colData(SE))[1],']'), levels(colData(SE)[[1]]), selected = levels(colData(SE)[[1]])[1], inline=FALSE)
+                radioButtons('what', paste0('Use following [',']'), "", inline=FALSE)
             ),
             actionButton(inputId = 'apply', label = 'Apply settings', class='btn-success')
             
@@ -72,9 +80,9 @@ shinyUI(fluidPage(
                 radioButtons('plotValues', 'Plot: ', list('All data points'='a', 'Filtered'='f', 'Select'='s'), inline=TRUE),
                 conditionalPanel(condition = 'input.plotValues == "s"', div(class='row', 
                     div(class='col-md-4',
-                        checkboxGroupInput('plotValues_f1', colnames(colData(SE))[1], levels(colData(SE)[[1]]), selected=levels(colData(SE)[[1]]))
+                        checkboxGroupInput('plotValues_f1', "", "")
                     ), div(class='col-md-4',
-                        checkboxGroupInput('plotValues_f2', colnames(colData(SE))[2], levels(colData(SE)[[2]]), selected=levels(colData(SE)[[2]]))
+                        checkboxGroupInput('plotValues_f2', "", "")
                 ))),
                 
                 radioButtons('plotType', 'Plot type: ', list('Norm counts'='N', 'RPKM'='fpkm', 'RPM'='fpm'), inline=TRUE),

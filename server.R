@@ -1,5 +1,4 @@
 library(shiny)
-load('SE_Fan.Rdata')
 library(DESeq2)
 library(ggplot2)
 library(scales)
@@ -8,14 +7,13 @@ library(DT)
 
 shinyServer(function(input, output, session) {
 
-    rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL, SE=SE)
+    rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL, SE=NULL)
     if(!file.exists("cache")) if(!dir.create('cache')) stop('FS is not writable.') else message('cache dir created') else message('cache OK')
     
     observe({
-        #message('loading: ', input$dataset)
-        #rv$SE <- get(load(file.path('data', input$dataset)))
-        #rv$SE <- SE
-        #updateRadioButtons(session, 'type', choices = colnames(colData(rv$SE))[1:2], selected = colnames(colData(rv$SE))[2])
+        message('loading: ', input$SEdata)
+        rv$SE <- get(load(file.path('data', input$SEdata)))
+        updateRadioButtons(session, 'type', choices = colnames(colData(rv$SE))[1:2], selected = colnames(colData(rv$SE))[2])
     })
     
     output$distPlot <- renderPlot({
@@ -123,7 +121,8 @@ shinyServer(function(input, output, session) {
                 fltstring <- if(input$filter) paste0(input$which, '_', input$what) else 'AllData'
                 
                 fn <- file.path('cache', paste0(
-                    'cache_LTR_', fltstring, '_', 
+                    sub('\\.', '_', input$SEdata),
+                    '_cache_LTR_', fltstring, '_', 
                     paste(as.character(as.formula(input$m1)), collapse=''), '_',
                     paste(as.character(as.formula(input$m0)), collapse=''), '.rda'
                 ))
@@ -153,7 +152,10 @@ shinyServer(function(input, output, session) {
             } else {
                 
                 fltstring <- if(input$filter) paste0(input$which, '_', input$what) else 'AllData'
-                fn <- file.path('cache', paste0('cache_Wald_', fltstring, '_', input$type, '.rda'))
+                fn <- file.path('cache', paste0(
+                    sub('\\.', '_', input$SEdata), 
+                    '_cache_Wald_', fltstring, '_', input$type, '.rda')
+                )
                 
                 if(file.exists(fn)) {
                     progress$set(message = 'Loading from cache:', value = 1, detail=fn); message('Loading from cache: ', fn)
@@ -173,7 +175,7 @@ shinyServer(function(input, output, session) {
                 }
                 
                 progress$set(message = 'Calculating Wald tests results', value = 2, detail=paste('Contrast: ', input$type, input$p1, input$p2))
-                res <- results(dds, contrast=c(input$type, input$p1, input$p2), test="Wald")
+                res <- results(dds, contrast=c(input$type, input$p1, input$p2), test="Wald", addMLE=TRUE)
                 rv$info <- paste0(elementMetadata(res)[,2], collapse='\n')
             }
             
@@ -194,12 +196,14 @@ shinyServer(function(input, output, session) {
     })
     
     output$info <- renderText({
-        input$apply
+        if( input$apply == 0 ) return('Press "Apply settings" to see the results table.')
         rv$table <- isolate( getResultTable() )
         return(rv$info)
     })
 
     output$data = DT::renderDataTable({
+        if(is.null(rv$table)) return()
+        
         action = session$registerDataObj('iris', rv$table, shiny:::dataTablesJSON)
         sketch = htmltools::withTags(table(
             tableHeader(rv$table),
@@ -219,23 +223,23 @@ shinyServer(function(input, output, session) {
         
         datatable(
             rv$table, 
-            server = TRUE, 
+            #server = TRUE, 
             rownames = FALSE,
             extensions = c('TableTools', 'ColReorder', 'ColVis'),
             container = sketch,
             callback = JS(readLines('callback.js')),,
             options = list(
                 processing = TRUE,
-                serverSide= TRUE,
+                serverSide = TRUE,
                 
                 deferRender = TRUE,
                 scrollY = 385,
                 
                 colReorder = list(realtime = TRUE),
                 
-                order=JS('[[ 9, "asc" ]]'),
+                order = JS('[[ 9, "asc" ]]'),
                 pageLength = 10,
-                lengthMenu=JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
+                lengthMenu = JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
                 columns = JS(readLines('colDef.js')),
                 dom = 'RCT<"clear">lfrtip',
                 tableTools = list(aButtons=btn, sRowSelect="os", sSwfPath = copySWF(dest='www', pdf = TRUE)),
@@ -245,7 +249,7 @@ shinyServer(function(input, output, session) {
                     type = 'POST'
                 )
             )
-        )  %>% formatRound(5:8, 2)
+        )  %>% formatRound(5:9, 2)
         
     })
 
@@ -341,12 +345,13 @@ shinyServer(function(input, output, session) {
 #             s = input$selected
 #             message(length(s))
 #             message(length(input$data_rows_current))
+            # counts(rv$dds, normalized=FALSE)[ rownames(getFLT(rv$table, input$sel)), ]
             out <- getFLT(rv$table, input$sel)
             out <- out[, -ncol(rv$table), drop = FALSE]
-            if('R' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=FALSE))
-            if('NR' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=TRUE))
-            if('RPM' %in% input$add) out <- cbind(out, fpm(rv$dds))
-            if('RPKM' %in% input$add) out <- cbind(out, fpkm(rv$dds))
+            if('R' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=FALSE)[rownames(out),,drop = FALSE] )
+            if('NR' %in% input$add) out <- cbind(out, counts(rv$dds, normalized=TRUE)[rownames(out),,drop = FALSE] )
+            if('RPM' %in% input$add) out <- cbind(out, fpm(rv$dds)[rownames(out),,drop = FALSE] )
+            if('RPKM' %in% input$add) out <- cbind(out, fpkm(rv$dds)[rownames(out),,drop = FALSE] )
             write.csv(out, con, row.names = FALSE)
         }
     )
@@ -378,6 +383,10 @@ output$debug_out <- renderPrint({
     if(input$debug_submit==0) return()
     isolate( eval(parse(text=input$debug_cmd)) )
 })
-    
+   
+observe({
+    file.copy(input$newfile$datapath, file.path('data', input$newfile$name))
+    updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
+}) 
 
 })

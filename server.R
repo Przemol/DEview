@@ -95,6 +95,9 @@ shinyServer(function(input, output, session) {
         info <- paste0("Use following [",input$which,"]:")
         updateRadioButtons(session, 'what', label=info, choices = ft, selected=head(ft, 1), inline=FALSE )
         
+        updateCheckboxGroupInput(session, 'plotValues_f1', colnames(colData(rv$SE))[1], levels(colData(rv$SE)[[1]]), selected=levels(colData(rv$SE)[[1]]))
+        updateCheckboxGroupInput(session, 'plotValues_f2', colnames(colData(rv$SE))[2], levels(colData(rv$SE)[[2]]), selected=levels(colData(rv$SE)[[2]]))
+        
     })
 
     

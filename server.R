@@ -15,6 +15,12 @@ shinyServer(function(input, output, session) {
         message('loading: ', input$SEdata)
         rv$SE <- get(load(file.path('data', input$SEdata)))
         updateRadioButtons(session, 'type', choices = colnames(colData(rv$SE))[1:2], selected = colnames(colData(rv$SE))[2])
+        if(length(attr(rv$SE, 'annosource'))){
+            #message(attr(rv$SE, 'annosource'))
+            updateTextInput(session, 'annosoeurce', value = attr(rv$SE, 'annosource'))
+        } else {
+            updateTextInput(session, 'annosoeurce', value = 'http://www.wormbase.org/species/c_elegans/gene/')
+        }
     })
     
     output$distPlot <- renderPlot({
@@ -23,7 +29,7 @@ shinyServer(function(input, output, session) {
         
         
         if(input$plotValues=='a') {
-            message('plotsetsetup')
+            #message('plotsetsetup')
             rv$plotset <- DESeqDataSet(rv$SE, ~ 1)
         } else if (input$plotValues=='f') {
             rv$plotset <- rv$dds
@@ -231,7 +237,7 @@ shinyServer(function(input, output, session) {
             rownames = FALSE,
             extensions = c('TableTools', 'ColReorder', 'ColVis'),
             container = sketch,
-            callback = JS(readLines('callback.js')),,
+            callback = JS(readLines('callback.js')),
             options = list(
                 processing = TRUE,
                 serverSide = TRUE,

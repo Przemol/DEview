@@ -92,7 +92,8 @@ shinyUI(fluidPage(
                 tags$hr(),
                 'Advanced',
                 checkboxInput('debug', 'Debug console'),
-                checkboxInput('advstat', 'Enable advanced stats options')
+                checkboxInput('advstat', 'Enable advanced stats options'),
+                textInput('annosoeurce', 'Annotation link', 'http://www.wormbase.org/species/c_elegans/gene/')
             
             ), tabPanel(
                 "Data and design",

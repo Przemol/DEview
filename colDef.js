@@ -1,7 +1,7 @@
 [
 { "title": 'Gene ID',
   "render": function ( data, type, row ) {
-      return '<a href="http://www.wormbase.org/species/c_elegans/gene/' + data + '" target="_new">' + data + '</a>'
+      return '<a href="' + $('#annosoeurce').val() + data + '" target="_new">' + data + '</a>'
   }
 },
 { "title": 'Gene' },
@@ -27,8 +27,16 @@
 { "title": 'LogFC' },
 { "title": 'FC error' },
 { "title": 'Statistic val' },
-{ "title": 'p-value' },
-{ "title": 'FDR' },
+{ "title": 'p-value',
+  "render": function ( data, type, row ) {
+    return '<span style="white-space: nowrap;">' + Number(data).toPrecision(2) + '</span>';
+  }
+},
+{ "title": 'FDR',
+  "render": function ( data, type, row ) {
+    return '<span style="white-space: nowrap;">' + Number(data).toPrecision(2) + '</span>';
+  }
+},
 
 { "title": 'Plot',
   "className": "table-center",

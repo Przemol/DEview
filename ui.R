@@ -69,7 +69,7 @@ shinyUI(fluidPage(
             
             ), tabPanel(
                 'Outputs/plot optins',
-                checkboxGroupInput('add', 'Add to CSV', list('Raw counts'='R', 'Normalized counts'='NR', 'Robust RPKM'='RPKM'), inline = TRUE),
+                checkboxGroupInput('add', 'Add to CSV', list('Raw counts'='R', 'Normalized counts'='NR', 'RPKM'='RPKM'), inline = TRUE),
                 
                 downloadButton('downloadData', label = "Get result table as CSV", class = NULL),
                 downloadButton('downloadDataFlt', label = "Get filtered results as CSV", class = NULL),

@@ -44,8 +44,8 @@ shinyServer(function(input, output, session) {
         
         
         data <- plotCounts(plotset, gene, intgroup=intgroups, returnData=TRUE)
-        if(input$plotType == 'fpm') data$count <- fpm(plotset)[gene,]
-        if(input$plotType == 'fpkm') data$count <- fpkm(plotset)[gene,]
+        if(input$plotType == 'fpm') data$count <- fpm(plotset, robust = FALSE)[gene,]
+        if(input$plotType == 'fpkm') data$count <- fpkm(plotset, robust = FALSE)[gene,]
         
         info <- sapply(mcols(plotset[gene,])[,1:2], as.character)
         #bm <- round( mcols(plotset[gene,])[,3], 2) 
@@ -53,7 +53,7 @@ shinyServer(function(input, output, session) {
         
         g <- ggplot(data, aes_string( x="stage", y="count", color=secondGroup, group=secondGroup )) + 
             geom_point() + guides(color=guide_legend(title=secondGroup)) +
-            stat_smooth(se=FALSE,method="loess", size = 1.3) +
+            stat_summary(fun.y = mean, geom="line", size = 1.1) +
             ggtitle(paste0(
                 info[1],  ' (', gene, ')\n ', info[2] #, '\n FDR=', res[gene,]$padj, '; BM=', bm
             ))

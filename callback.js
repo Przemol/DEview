@@ -1,4 +1,4 @@
-$('table tfoot th').slice(0,3).each( function () {
+$('table tfoot th').slice(0,4).each( function () {
     var title = $('table thead th').eq( $(this).index() ).text();
     var width = $('table thead th').eq( $(this).index() ).width()+25;
     $(this).html( '<input type=\"text\" placeholder=\"'+title+'\" style=\"width:'+width+'px;\" />' );

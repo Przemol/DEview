@@ -6,6 +6,7 @@
 },
 { "title": 'Gene' },
 { "title": 'Seq ID' },
+{ "title": 'Type' },
   { "title": '',
     "className": "table-center",
     "width": "1%",
@@ -14,7 +15,7 @@
     "render": function ( data, type, row ) {
       if (data.length) {
         return '<button class="btn btn-info btn-xs no_select" rel="popover" data-content="'+ data +'" data-original-title="'+row[1] + ' (' +row[0]+')"'+ 
-          'onClick="$(this).popover({trigger: \'hover\', placement: \'left\'}).popover(\'show\')">'+'<span class="glyphicon glyphicon glyphicon-info-sign" aria-hidden="true"></span></button>'
+          'onmouseover="$(this).popover({trigger: \'hover\', placement: \'left\'}).popover(\'show\')">'+'<span class="glyphicon glyphicon glyphicon-info-sign" aria-hidden="true"></span></button>'
       } else {
         return '<div style="width: 29px"></div>'
       }
@@ -45,7 +46,7 @@
   "width": "1%",
   "render": function ( data, type, row ) {
       return '<button class="btn btn-xs btn-success no_select"'+
-      'onClick="Shiny.shinyapp.sendInput({\'plot\':\''+row[0]+'\'});'+
+      'onClick="$(\'[data-value=Plot]\').click(); Shiny.shinyapp.sendInput({\'plot\':\''+row[0]+'\'});'+
       '"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span></button>'
   }
 }

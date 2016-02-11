@@ -3,20 +3,21 @@ library(DESeq2)
 library(ggplot2)
 library(DT)
 
-shinyUI(fluidPage(
-    
+shinyUI(navbarPage(
+    'DEview', id = 'nvpage',
+
+
+    tabPanel('Settings',
+             singleton(tags$script(type="text/javascript", src="addons.js")),
+             singleton(tags$link(type="text/css", rel="stylesheet", href="style.css")),
+             
     # Application title
-    singleton(tags$script(type="text/javascript", src="addons.js")),
-    singleton(tags$link(type="text/css", rel="stylesheet", href="style.css")),
-    
-    fluidRow(
-        column(
-            4, 
-            titlePanel("DEview"),
-            conditionalPanel(
-                condition = 'input.plot',
-                plotOutput("distPlot")
-            ),
+
+######## Settings ###############
+
+fluidRow(
+    column(
+        4,
             tabsetPanel(type = 'tabs', position = 'above', tabPanel('Statistical test',
             div(class='row', div(class='col-md-6',
                 selectInput('SEdata', 'Dataset', choices = dir('data') )
@@ -102,10 +103,11 @@ shinyUI(fluidPage(
                 #,
                 
                 #selectInput('dataset', 'Dataset', dir('data'))
-            ))
-        ),
-        column(
-            8,
+            )
+        )
+    ))
+            ######## EIS ###############
+    ), tabPanel('Results',
             tags$br(),
             DT::dataTableOutput("data"),
 
@@ -121,9 +123,12 @@ shinyUI(fluidPage(
                 #DT::dataTableOutput("data2")
             )
             
-        )
-        
+    ),
+    tabPanel('Plot',
+        plotOutput("distPlot")
     )
+        
+    
     
     # Sidebar with a slider input for number of bins
     

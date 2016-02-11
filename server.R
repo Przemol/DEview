@@ -196,6 +196,7 @@ shinyServer(function(input, output, session) {
                 gene=if(length(mcols(dds)$geneName)) as.character(mcols(dds)$geneName) else "",
                 
                 seqID=if(length(mcols(dds)$seqID)) as.character(mcols(dds)$seqID) else "",
+                type=if(length(mcols(dds)$type)) as.character(mcols(dds)$type) else "",
                 info=if(length(mcols(dds)$desc)) as.character(mcols(dds)$desc)else "",
                 as.data.frame(res), 
                 Plot=NA,
@@ -259,7 +260,7 @@ shinyServer(function(input, output, session) {
                     type = 'POST'
                 )
             )
-        )  %>% formatRound(5:9, 2)
+        ) # %>% formatRound((5:9)+1, 2)
         
     })
 
@@ -411,5 +412,10 @@ observe({
         updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
     })
 }) 
+
+observe({
+    if(input$apply==0) return()
+    updateNavbarPage(session, inputId = 'nvpage', selected = 'Results')
+})
 
 })

@@ -1,7 +1,7 @@
 [
 { "title": 'Gene ID',
   "render": function ( data, type, row ) {
-      return '<a href="' + $('#annosoeurce').val() + data + '" target="_new">' + data + '</a>'
+      return '<a href="' + $('#annosoeurce').val() + data.replace('\.', '?') + '" target="_new">' + data + '</a>'
   }
 },
 { "title": 'Gene' },

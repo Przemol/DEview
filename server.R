@@ -239,6 +239,7 @@ shinyServer(function(input, output, session) {
             extensions = c('TableTools', 'ColReorder', 'ColVis'),
             container = sketch,
             callback = JS(readLines('callback.js')),
+            plugins = 'natural',
             options = list(
                 processing = TRUE,
                 serverSide = TRUE,
@@ -248,7 +249,7 @@ shinyServer(function(input, output, session) {
                 
                 colReorder = list(realtime = TRUE),
                 
-                order = JS('[[ 9, "asc" ]]'),
+                order = JS('[[ 11, "asc" ]]'),
                 pageLength = 10,
                 lengthMenu = JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
                 columns = JS(readLines('colDef.js')),

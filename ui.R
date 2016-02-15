@@ -15,19 +15,20 @@ shinyUI(navbarPage(
 
 ######## Settings ###############
 
-fluidRow(
-    column(
-        4,
-            tabsetPanel(type = 'tabs', position = 'above', tabPanel('Statistical test',
-            div(class='row', div(class='col-md-6',
-                selectInput('SEdata', 'Dataset', choices = dir('data') )
-            ), div(class='col-md-3',
-                   shiny::fileInput('newfile', 'Add')
+
+        tabsetPanel(type = 'tabs', position = 'above', tabPanel('Statistical test',
+            
+            
+            div(class='row', div(class='col-md-4',
+                   selectInput('SEdata', 'Dataset', choices = dir('data'), width = '400px' )
+            ), class='row', div(class='col-md-3',
+                   shiny::fileInput('newfile', 'Add dataset')
             ), div(class='col-md-1',
-                   tags$br(), shiny::downloadButton('dlfile', '', class='btn btn-success btn-sm')
+                   tags$br(), shiny::downloadButton('dlfile', 'Download', class='btn btn-success btn-sm')
             ), div(class='col-md-1',
-                   tags$br(), shiny::actionButton('rmfile', '', icon = icon('remove'), class='btn btn-danger btn-sm', position='middle')
+                   tags$br(), shiny::actionButton('rmfile', 'Remove', icon = icon('remove'), class='btn btn-danger btn-sm', position='middle')
             )),
+            tags$hr(),
             
             conditionalPanel(condition = 'input.advstat', selectInput(
                 inputId = 'test',
@@ -36,19 +37,18 @@ fluidRow(
             )), 
             conditionalPanel(
                 condition = 'input.test == "Wald"',
-                div(class='row', div(class='col-md-3',
+                div(class='row', div(class='col-md-2',
                     radioButtons(
                         inputId = 'type', 
                         label = 'Compare', 
                         choices = ""
                     )
-                ), div(class='col-md-3',
+                ), div(class='col-md-2',
                        radioButtons('p1', paste0('[',']'), "")
-                ), div(class='col-md-3',
+                ), div(class='col-md-2',
                        radioButtons('p2', 'versus', "")
                 ))
             ),
-            
             conditionalPanel(
                 condition = 'input.test == "LRT"',
                 textInput('m1', 'Model formula', paste0('~ ', "strain" )),
@@ -105,7 +105,6 @@ fluidRow(
                 #selectInput('dataset', 'Dataset', dir('data'))
             )
         )
-    ))
             ######## EIS ###############
     ), tabPanel('Results',
             tags$br(),

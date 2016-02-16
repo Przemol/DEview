@@ -2,12 +2,12 @@ library(shiny)
 library(DESeq2)
 library(ggplot2)
 library(scales)
-library(DT)
 
 options("shiny.maxRequestSize" = -1)
 
 shinyServer(function(input, output, session) {
 
+    
     rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL, SE=NULL)
     if(!file.exists("cache")) if(!dir.create('cache')) stop('FS is not writable.') else message('cache dir created') else message('cache OK')
     
@@ -217,14 +217,14 @@ shinyServer(function(input, output, session) {
         
         action = session$registerDataObj('iris', rv$table, shiny:::dataTablesJSON)
         sketch = htmltools::withTags(table(
-            tableHeader(rv$table),
-            tableFooter(rep('', ncol(rv$table)))
+            DT::tableHeader(rv$table),
+            DT::tableFooter(rep('', ncol(rv$table)))
         ))
-        callback = JS("
+        callback = DT::JS("
     
         ")
         
-        btn <- JS('[{"sExtends": "div", "sButtonClass": "button-label"},
+        btn <- DT::JS('[{"sExtends": "div", "sButtonClass": "button-label"},
             "copy", "csv", "xls", "pdf", "print",
             {"sExtends": "text", "sButtonText": "Sel. all", "fnClick": function ( node, conf ) {
                  this.fnSelectAll( true );
@@ -232,13 +232,13 @@ shinyServer(function(input, output, session) {
                } }, "select_none"
             ]')
         
-        datatable(
+        dt <- DT::datatable(
             rv$table, 
             #server = TRUE, 
             rownames = FALSE,
             extensions = c('TableTools', 'ColReorder', 'ColVis'),
             container = sketch,
-            callback = JS(readLines('callback.js')),
+            callback = DT::JS(readLines('callback.js')),
             plugins = 'natural',
             options = list(
                 processing = TRUE,
@@ -249,19 +249,20 @@ shinyServer(function(input, output, session) {
                 
                 colReorder = list(realtime = TRUE),
                 
-                order = JS('[[ 11, "asc" ]]'),
+                order = DT::JS('[[ 11, "asc" ]]'),
                 pageLength = 10,
-                lengthMenu = JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
-                columns = JS(readLines('colDef.js')),
+                lengthMenu = DT::JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
+                columns = DT::JS(readLines('colDef.js')),
                 dom = 'RCT<"clear">lfrtip',
-                tableTools = list(aButtons=btn, sRowSelect="os", sSwfPath = copySWF(dest='www', pdf = TRUE)),
-                #fnServerParams= JS("function(params) {Shiny.shinyapp.sendInput({sel:this.DataTable().ajax.params()});}"),
+                tableTools = list(aButtons=btn, sRowSelect="os", sSwfPath = DT::copySWF(dest='www', pdf = TRUE)),
+                #fnServerParams= DT::JS("function(params) {Shiny.shinyapp.sendInput({sel:this.DataTable().ajax.params()});}"),
                 ajax = list(
                     url = action, 
                     type = 'POST'
                 )
             )
-        ) # %>% formatRound((5:9)+1, 2)
+        )
+        DT::formatRound(dt, (5:9)+1, 2)
         
     })
 
@@ -370,14 +371,14 @@ shinyServer(function(input, output, session) {
 # 
 # output$data2 <- DT::renderDataTable({    
 #     action = dataTableAjax(session, rv$table, rownames = FALSE)
-#     datatable(
+#     DT::datatable(
 #         rv$table, 
 #         #server = TRUE, 
 #         rownames = FALSE,
 # 
 #         options = list(
 #             #ajax = list(url = action),
-#             columns = JS(readLines('colDef.js'))
+#             columns = DT::JS(readLines('colDef.js'))
 #         )
 #     )
 # })
@@ -388,7 +389,7 @@ output$design <- DT::renderDataTable({
     rownames(des) <- 1:nrow(des)
     if(!input$desall) des <- des[des[[input$which]] == input$what,]
 
-    datatable(des, rownames = TRUE)
+    DT::datatable(des, rownames = TRUE)
 })
 
 output$debug_out <- renderPrint({

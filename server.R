@@ -2,11 +2,18 @@ library(shiny)
 library(DESeq2)
 library(ggplot2)
 library(scales)
+library(RMySQL)
+library(dplyr)
+library(Rsamtools)
+library(GenomicAlignments)
 
 options("shiny.maxRequestSize" = -1)
 
 shinyServer(function(input, output, session) {
 
+    con <- dbConnect(dbDriver("MySQL"), group = "jadb", default.file='~/.my.cnf')
+    all_rna <<- dbReadTable(con, "labrnaseq")
+    dbDisconnect(con)
     
     rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL, SE=NULL)
     if(!file.exists("cache")) if(!dir.create('cache')) stop('FS is not writable.') else message('cache dir created') else message('cache OK')
@@ -212,8 +219,9 @@ shinyServer(function(input, output, session) {
         return(rv$info)
     })
 
-    output$data = DT::renderDataTable({
-        if(is.null(rv$table)) return()
+    output$data <- DT::renderDataTable({
+        if( input$apply == 0 ) stop('Press "Apply settings" to see the results table.')
+        if(is.null(rv$table)) return('Empty table')
         
         action = session$registerDataObj('iris', rv$table, shiny:::dataTablesJSON)
         sketch = htmltools::withTags(table(
@@ -383,41 +391,121 @@ shinyServer(function(input, output, session) {
 #     )
 # })
 
-output$design <- DT::renderDataTable({
-    #tmp <- if(input$desall) SE else SE[,colData(SE)[[input$which]] == input$what]
-    des <- as.data.frame(colData(rv$SE))
-    rownames(des) <- 1:nrow(des)
-    if(!input$desall) des <- des[des[[input$which]] == input$what,]
-
-    DT::datatable(des, rownames = TRUE)
-})
-
-output$debug_out <- renderPrint({
-    if(input$debug_submit==0) return()
-    isolate( eval(parse(text=input$debug_cmd)) )
-})
-   
-observe({
-    file.copy(input$newfile$datapath, file.path('data', input$newfile$name))
-    updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
-}) 
-
-output$dlfile <- downloadHandler(input$SEdata, content = function(x) { 
-    file.copy(file.path('data', input$SEdata), x) 
-})
-
-observe({
-    if(input$rmfile == 0) return()
-    isolate({
-        file.remove(file.path('data', input$SEdata))
-        file.remove(file.path('cache', dir('cache', pattern=paste0(sub('\\.', '_', input$SEdata), '_cache'))))
-        updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
+    output$design <- DT::renderDataTable({
+        #tmp <- if(input$desall) SE else SE[,colData(SE)[[input$which]] == input$what]
+        des <- as.data.frame(colData(rv$SE))
+        #rownames(des) <- 1:nrow(des)
+        if(!input$desall) des <- des[des[[input$which]] == input$what,]
+    
+        DT::datatable(des, rownames = TRUE)
     })
-}) 
-
-observe({
-    if(input$apply==0) return()
-    updateNavbarPage(session, inputId = 'nvpage', selected = 'Results')
-})
+    
+    output$debug_out <- renderPrint({
+        if(input$debug_submit==0) return()
+        isolate( eval(parse(text=input$debug_cmd)) )
+    })
+       
+    observe({
+        file.copy(input$newfile$datapath, file.path('data', input$newfile$name))
+        updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
+    }) 
+    
+    output$dlfile <- downloadHandler(input$SEdata, content = function(x) { 
+        file.copy(file.path('data', input$SEdata), x) 
+    })
+    
+    observe({
+        if(input$rmfile == 0) return()
+        isolate({
+            file.remove(file.path('data', input$SEdata))
+            file.remove(file.path('cache', dir('cache', pattern=paste0(sub('\\.', '_', input$SEdata), '_cache'))))
+            updateSelectInput(session, inputId = 'SEdata', label = 'Dataset', choices = dir('data') )
+        })
+    }) 
+    
+    observe({
+        if(input$apply==0) return()
+        updateNavbarPage(session, inputId = 'nvpage', selected = 'Results')
+    })
+    
+### New dataset logic ####
+    getDBtable <- function(data) { 
+        renderDataTable({
+            datatable(
+                data,
+                filter = 'top',
+                extensions = c('ColReorder', 'ColVis'),
+                plugins = 'natural',
+                options = list(
+                    pageLength = 10, 
+                    autoWidth = TRUE,
+                    searchHighlight = TRUE,
+                    dom = 'CRlfrtip', 
+                    colReorder = list(realtime = TRUE),
+                    k_row = 5,
+                    k_col = 2,
+                    searchDelay = 10,
+                    search = list(regex = TRUE)
+                )
+            ) %>% formatDate(c('dateCreated', 'dateUpdated'), 'toLocaleDateString')
+        })
+    }
+    
+    output$RNAseq <- getDBtable(
+        all_rna %>% dplyr::select(
+            RNAtype, LibraryType, ExtractID, Strain, Stage, ContactExpID, dateCreated, dateUpdated
+        ) %>% mutate(
+            dateCreated=as.Date(dateCreated), dateUpdated=as.Date(dateUpdated)
+        )
+    )
+    
+    observeEvent(input$runNewDataset, {
+        withProgress(
+            message = 'Calculation in progress',
+            detail = 'This may take a while...', value = 0, 
+            {
+        
+                ids <- unlist(all_rna[input$RNAseq_rows_selected,]$ContactExpID)
+                if (length(ids)==0) return()
+                
+                bam <- lapply(ids, JADBtools::getFilePath, format = 'bam')
+                names(bam) <- ids
+                if (all(bam  %>% elementLengths == 1)) bam <- unlist(bam) else stop('Multiple experiments per ID')
+                
+                tmp <- tempdir()
+                
+                tempfiles <- sapply(bam, function(x) {
+                    incProgress((1/length(bam))/2, message =  'Downloading', detail = basename(x))
+                    download.file(x, file.path(tmp, basename(x)))
+                    return(file.path(tmp, basename(x)))
+                })
+                
+                incProgress((1/length(bam))/2, message =  'Counting tags', detail = '')
+                    
+                mapq_filter <- function(features, reads, algorithm,
+                                        ignore.strand, inter.feature)
+                { 
+                    incProgress((1/length(bam))/2)
+                    require(GenomicAlignments) # needed for parallel evaluation
+                    Union(features, reads[mcols(reads)$mapq >= input$mapq], algorithm,
+                          ignore.strand, inter.feature) 
+                }
+                param <- ScanBamParam(what="mapq")
+                bfl <- BamFileList( tempfiles )
+                
+                model <- get(load(
+                    system.file('data', input$countmodel, package='JADBtools')
+                ))
+                SEuniq <- summarizeOverlaps(model, bfl, mode=mapq_filter, param=param)
+                
+                colData(SEuniq)$strain <- factor(unlist(JADBtools::getStrain(ids)))
+                colData(SEuniq)$stage <- factor(unlist(JADBtools::getStage(ids)))
+                
+                save(SEuniq, file=file.path('data', paste0(input$datasetName, '.Rdata')))
+                message('DONE!!!')
+                
+            }
+        )
+    })
 
 })

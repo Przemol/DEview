@@ -1,6 +1,7 @@
 library(shiny)
 library(DESeq2)
 library(ggplot2)
+library(DT)
 
 shinyUI(navbarPage(
     'DEview', id = 'nvpage',

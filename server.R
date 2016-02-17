@@ -6,6 +6,7 @@ library(RMySQL)
 library(dplyr)
 library(Rsamtools)
 library(GenomicAlignments)
+library(DT)
 
 options("shiny.maxRequestSize" = -1)
 
@@ -13,6 +14,7 @@ shinyServer(function(input, output, session) {
 
     con <- dbConnect(dbDriver("MySQL"), group = "jadb", default.file='~/.my.cnf')
     all_rna <<- dbReadTable(con, "labrnaseq")
+    rownames(all_rna) <<- all_rna$ContactExpID
     dbDisconnect(con)
     
     rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL, SE=NULL)
@@ -498,8 +500,8 @@ shinyServer(function(input, output, session) {
                 ))
                 SEuniq <- summarizeOverlaps(model, bfl, mode=mapq_filter, param=param)
                 
-                colData(SEuniq)$strain <- factor(unlist(JADBtools::getStrain(ids)))
-                colData(SEuniq)$stage <- factor(unlist(JADBtools::getStage(ids)))
+                colData(SEuniq)$strain <- factor(all_rna[ids,]$Strain)
+                colData(SEuniq)$stage <- factor(all_rna[ids,]$Stage)
                 
                 save(SEuniq, file=file.path('data', paste0(input$datasetName, '.Rdata')))
                 message('DONE!!!')

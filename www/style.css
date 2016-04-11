@@ -8,10 +8,10 @@
 .shiny-progress .progress-text {
     left: 50%;
     top: 120px !important;
-    margin-left:-200px;
+    margin-left:-400px;
     height: auto;
     opacity: 0.90;
-    width: 400px;
+    width: 800px;
     border-style: solid;
     border-width: 3px;
     display: block;

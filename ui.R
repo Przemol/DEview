@@ -1,6 +1,7 @@
 library(shiny)
 library(DESeq2)
 library(ggplot2)
+library(DT)
 
 shinyUI(navbarPage(
     'DEview', id = 'nvpage',
@@ -108,7 +109,7 @@ shinyUI(navbarPage(
     ), tabPanel('Results',
             tags$br(),
             DT::dataTableOutput("data"),
-
+            tags$br(),
             tags$strong('Numeric column definitions:'),
             verbatimTextOutput('info'),
             conditionalPanel(
@@ -124,6 +125,20 @@ shinyUI(navbarPage(
     ),
     tabPanel('Plot',
         plotOutput("distPlot")
+    ),
+    tabPanel('New dataset',
+        dataTableOutput('RNAseq'),
+        
+        div(class='row', div(class='col-md-3',
+            selectInput('countmodel', 'Select gene model', dir(system.file('data', package='JADBtools')))
+        ), div(class='col-md-3',
+            numericInput('mapq', 'Mapping quality cutoff', 10)
+        ), div(class='col-md-3',
+            textInput('datasetName', 'Name of dataset')
+        ), div(class='col-md-3',
+            tags$br() 
+        )), 
+        actionButton('runNewDataset', 'Run', class='btn-success')
     )
         
     

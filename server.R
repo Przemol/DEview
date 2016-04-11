@@ -246,7 +246,7 @@ shinyServer(function(input, output, session) {
             rv$table, 
             #server = TRUE, 
             rownames = FALSE,
-            extensions = c('TableTools', 'ColReorder', 'ColVis'),
+            #extensions = c('ColReorder', 'ColVis'),
             container = sketch,
             callback = DT::JS(readLines('callback.js')),
             plugins = 'natural',
@@ -264,7 +264,7 @@ shinyServer(function(input, output, session) {
                 lengthMenu = DT::JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
                 columns = DT::JS(readLines('colDef.js')),
                 dom = 'RCT<"clear">lfrtip',
-                tableTools = list(aButtons=btn, sRowSelect="os", sSwfPath = DT::copySWF(dest='www', pdf = TRUE)),
+                tableTools = list(aButtons=btn, sRowSelect="os"),
                 #fnServerParams= DT::JS("function(params) {Shiny.shinyapp.sendInput({sel:this.DataTable().ajax.params()});}"),
                 ajax = list(
                     url = action, 

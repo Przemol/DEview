@@ -258,13 +258,13 @@ shinyServer(function(input, output, session) {
                 scrollY = 385,
                 
                 colReorder = list(realtime = TRUE),
-                
+                selection = 'none',
                 order = DT::JS('[[ 11, "asc" ]]'),
                 pageLength = 10,
                 lengthMenu = DT::JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
                 columns = DT::JS(readLines('colDef.js')),
                 dom = 'RCT<"clear">lfrtip',
-                tableTools = list(aButtons=btn, sRowSelect="os"),
+                #tableTools = list(aButtons=btn, sRowSelect="os"),
                 #fnServerParams= DT::JS("function(params) {Shiny.shinyapp.sendInput({sel:this.DataTable().ajax.params()});}"),
                 ajax = list(
                     url = action, 
@@ -436,7 +436,7 @@ shinyServer(function(input, output, session) {
             datatable(
                 data,
                 filter = 'top',
-                extensions = c('ColReorder', 'ColVis'),
+                #extensions = c('ColReorder', 'ColVis'),
                 plugins = 'natural',
                 options = list(
                     pageLength = 10, 
@@ -455,7 +455,7 @@ shinyServer(function(input, output, session) {
     
     output$RNAseq <- getDBtable(
         all_rna %>% dplyr::select(
-            RNAtype, LibraryType, ExtractID, Strain, Stage, ContactExpID, dateCreated, dateUpdated
+            RNApurification, LibraryType, ExtractID, Strain, Stage, ContactExpID, dateCreated, dateUpdated
         ) %>% mutate(
             dateCreated=as.Date(dateCreated), dateUpdated=as.Date(dateUpdated)
         )

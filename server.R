@@ -402,6 +402,33 @@ shinyServer(function(input, output, session) {
         DT::datatable(des, rownames = TRUE)
     })
     
+    output$gotable <- DT::renderDataTable({
+        tab <- rv$table
+        tab <- tab[!is.na(tab$padj),]
+        tab <- tab[tab$padj <= input$gocutoff,]
+        names <- as.character(tab$seqID)
+        go <- gProfileR::gprofiler(names, organism = 'celegans')
+        DT::datatable(go, rownames = TRUE)
+    })
+    
+    output$goplot <- renderImage({
+        # Read plot2's width and height. These are reactive values, so this
+        # expression will re-run whenever these values change.
+        # A temp file to save the output.
+        outfile <- tempfile(fileext='.png')
+        
+        tab <- rv$table
+        tab <- tab[!is.na(tab$padj),]
+        tab <- tab[tab$padj <= input$gocutoff,]
+        names <- as.character(tab$seqID)
+        #gProfileR::gprofiler(c("Klf4", "Pax5", "Sox2", "Nanog"), organism = "mmusculus",  png_fn = outfile, include_graph = TRUE)
+        gProfileR::gprofiler(names, organism = 'celegans',  png_fn = outfile, include_graph = TRUE)
+        
+        # Return a list containing the filename
+        list(src = outfile,
+             alt = "GOplot placeholder")
+    }, deleteFile = TRUE)
+    
     output$debug_out <- renderPrint({
         if(input$debug_submit==0) return()
         isolate( eval(parse(text=input$debug_cmd)) )

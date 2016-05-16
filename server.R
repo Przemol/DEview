@@ -250,6 +250,7 @@ shinyServer(function(input, output, session) {
             container = sketch,
             callback = DT::JS(readLines('callback.js')),
             plugins = 'natural',
+            selection = 'none',
             options = list(
                 processing = TRUE,
                 serverSide = TRUE,
@@ -258,7 +259,6 @@ shinyServer(function(input, output, session) {
                 scrollY = 385,
                 
                 colReorder = list(realtime = TRUE),
-                selection = 'none',
                 order = DT::JS('[[ 11, "asc" ]]'),
                 pageLength = 10,
                 lengthMenu = DT::JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),

@@ -126,6 +126,12 @@ shinyUI(navbarPage(
     tabPanel('Plot',
         plotOutput("distPlot")
     ),
+    tabPanel('GO',
+        numericInput('gocutoff', 'FDR cotoff', 0.05, step = 0.01, width = 150),
+        dataTableOutput('gotable'),
+        tags$hr(),
+        imageOutput('goplot')
+    ),
     tabPanel('New dataset',
         dataTableOutput('RNAseq'),
         
@@ -140,6 +146,7 @@ shinyUI(navbarPage(
         )), 
         actionButton('runNewDataset', 'Run', class='btn-success')
     )
+
         
     
     

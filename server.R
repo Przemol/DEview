@@ -7,18 +7,22 @@ library(dplyr)
 library(Rsamtools)
 library(GenomicAlignments)
 library(DT)
+library(JADBtools)
 
 options("shiny.maxRequestSize" = -1)
+options(shiny.sanitize.errors = FALSE)
 
 shinyServer(function(input, output, session) {
 
+    try(testConnection())
+    
     con <- dbConnect(dbDriver("MySQL"), group = "jadb", default.file='~/.my.cnf')
     all_rna <<- dbReadTable(con, "labrnaseq")
     rownames(all_rna) <<- all_rna$ContactExpID
     dbDisconnect(con)
     
     rv <- reactiveValues(info='start', dds=NULL, plot=NULL, table=NULL, SE=NULL)
-    if(!file.exists("cache")) if(!dir.create('cache')) stop('FS is not writable.') else message('cache dir created') else message('cache OK')
+    if(!file.exists("cache")) if(!dir.create('cache')) stop(safeError('FS is not writable.')) else message('cache dir created') else message('cache OK')
     
     observe({
         message('loading: ', input$SEdata)
@@ -222,7 +226,7 @@ shinyServer(function(input, output, session) {
     })
 
     output$data <- DT::renderDataTable({
-        if( input$apply == 0 ) stop('Press "Apply settings" to see the results table.')
+        if( input$apply == 0 ) stop(safeError('Press "Apply settings" to see the results table.'))
         if(is.null(rv$table)) return('Empty table')
         
         action = session$registerDataObj('iris', rv$table, shiny:::dataTablesJSON)
@@ -250,6 +254,7 @@ shinyServer(function(input, output, session) {
             container = sketch,
             callback = DT::JS(readLines('callback.js')),
             plugins = 'natural',
+            selection = 'none',
             options = list(
                 processing = TRUE,
                 serverSide = TRUE,
@@ -258,13 +263,12 @@ shinyServer(function(input, output, session) {
                 scrollY = 385,
                 
                 colReorder = list(realtime = TRUE),
-                
                 order = DT::JS('[[ 11, "asc" ]]'),
                 pageLength = 10,
                 lengthMenu = DT::JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
                 columns = DT::JS(readLines('colDef.js')),
                 dom = 'RCT<"clear">lfrtip',
-                tableTools = list(aButtons=btn, sRowSelect="os"),
+                #tableTools = list(aButtons=btn, sRowSelect="os"),
                 #fnServerParams= DT::JS("function(params) {Shiny.shinyapp.sendInput({sel:this.DataTable().ajax.params()});}"),
                 ajax = list(
                     url = action, 
@@ -402,6 +406,33 @@ shinyServer(function(input, output, session) {
         DT::datatable(des, rownames = TRUE)
     })
     
+    output$gotable <- DT::renderDataTable({
+        tab <- rv$table
+        tab <- tab[!is.na(tab$padj),]
+        tab <- tab[tab$padj <= input$gocutoff,]
+        names <- as.character(tab$seqID)
+        go <- gProfileR::gprofiler(names, organism = 'celegans')
+        DT::datatable(go, rownames = TRUE)
+    })
+    
+    output$goplot <- renderImage({
+        # Read plot2's width and height. These are reactive values, so this
+        # expression will re-run whenever these values change.
+        # A temp file to save the output.
+        outfile <- tempfile(fileext='.png')
+        
+        tab <- rv$table
+        tab <- tab[!is.na(tab$padj),]
+        tab <- tab[tab$padj <= input$gocutoff,]
+        names <- as.character(tab$seqID)
+        #gProfileR::gprofiler(c("Klf4", "Pax5", "Sox2", "Nanog"), organism = "mmusculus",  png_fn = outfile, include_graph = TRUE)
+        gProfileR::gprofiler(names, organism = 'celegans',  png_fn = outfile, include_graph = TRUE)
+        
+        # Return a list containing the filename
+        list(src = outfile,
+             alt = "GOplot placeholder")
+    }, deleteFile = TRUE)
+    
     output$debug_out <- renderPrint({
         if(input$debug_submit==0) return()
         isolate( eval(parse(text=input$debug_cmd)) )
@@ -436,7 +467,7 @@ shinyServer(function(input, output, session) {
             datatable(
                 data,
                 filter = 'top',
-                extensions = c('ColReorder', 'ColVis'),
+                #extensions = c('ColReorder', 'ColVis'),
                 plugins = 'natural',
                 options = list(
                     pageLength = 10, 
@@ -455,7 +486,7 @@ shinyServer(function(input, output, session) {
     
     output$RNAseq <- getDBtable(
         all_rna %>% dplyr::select(
-            RNAtype, LibraryType, ExtractID, Strain, Stage, ContactExpID, dateCreated, dateUpdated
+            RNApurification, LibraryType, ExtractID, Strain, Stage, ContactExpID, dateCreated, dateUpdated
         ) %>% mutate(
             dateCreated=as.Date(dateCreated), dateUpdated=as.Date(dateUpdated)
         )
@@ -472,10 +503,10 @@ shinyServer(function(input, output, session) {
                 
                 bam <- lapply(ids, JADBtools::getFilePath, format = 'bam')
                 names(bam) <- ids
-                if (all(bam  %>% elementLengths == 1)) bam <- unlist(bam) else stop('Multiple experiments per ID')
+                if (all(bam  %>% lengths == 1)) bam <- unlist(bam) else stop('Multiple experiments per ID')
                 
                 tmp <- tempdir()
-                
+                message('tempdir: ', tmp)
                 tempfiles <- sapply(bam, function(x) {
                     incProgress((1/length(bam))/2, message =  'Downloading', detail = basename(x))
                     download.file(x, file.path(tmp, basename(x)))
@@ -484,12 +515,11 @@ shinyServer(function(input, output, session) {
                 
                 incProgress((1/length(bam))/2, message =  'Counting tags', detail = '')
                     
-                mapq_filter <- function(features, reads, algorithm,
-                                        ignore.strand, inter.feature)
+                mapq_filter <- function(features, reads, ignore.strand, inter.feature)
                 { 
                     incProgress((1/length(bam))/2)
                     require(GenomicAlignments) # needed for parallel evaluation
-                    Union(features, reads[mcols(reads)$mapq >= input$mapq], algorithm,
+                    GenomicAlignments::Union(features, reads[mcols(reads)$mapq >= input$mapq],
                           ignore.strand, inter.feature) 
                 }
                 param <- ScanBamParam(what="mapq")
@@ -498,7 +528,8 @@ shinyServer(function(input, output, session) {
                 model <- get(load(
                     system.file('data', input$countmodel, package='JADBtools')
                 ))
-                SEuniq <- summarizeOverlaps(model, bfl, mode=mapq_filter, param=param)
+                message('Counting')
+                SEuniq <- summarizeOverlaps(model, bfl, mode=mapq_filter, param=param, ignore.strand = TRUE)
                 
                 colData(SEuniq)$strain <- factor(all_rna[ids,]$Strain)
                 colData(SEuniq)$stage <- factor(all_rna[ids,]$Stage)

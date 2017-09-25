@@ -136,7 +136,10 @@ shinyUI(navbarPage(
         dataTableOutput('RNAseq'),
         
         div(class='row', div(class='col-md-3',
-            selectInput('countmodel', 'Select gene model', dir(system.file('data', package='JADBtools')))
+            selectInput(
+                'countmodel', 'Select gene model', 
+                dir(system.file('data', package='JADBtools')) %>% .[!grepl("gnmodel.rda", .)]   %>% c('gnmodel.rda', .)
+            )
         ), div(class='col-md-3',
             numericInput('mapq', 'Mapping quality cutoff', 10)
         ), div(class='col-md-3',

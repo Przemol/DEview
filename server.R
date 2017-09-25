@@ -16,6 +16,28 @@ shinyServer(function(input, output, session) {
 
     try(testConnection())
     
+    my_validate <- function(...) {
+        results <- sapply(list(...), function(x) {
+            if (is.null(x)) 
+                return(NA_character_)
+            else if (identical(x, FALSE)) 
+                return("")
+            else if (is.character(x)) 
+                return(paste(as.character(x), collapse = "\n"))
+            else stop("Unexpected validation result: ", as.character(x))
+        })
+        results <- stats::na.omit(results)
+        if (length(results) == 0) 
+            return(invisible())
+        results <- results[nzchar(results)]
+        showModal(modalDialog(
+            title = "ERROR",
+            HTML(paste(results, collapse = "</br>")),
+            easyClose = TRUE
+        ))
+        validate(...)
+    }
+    
     con <- dbConnect(dbDriver("MySQL"), group = "jadb", default.file='~/.my.cnf')
     all_rna <<- dbReadTable(con, "labrnaseq")
     rownames(all_rna) <<- all_rna$ContactExpID
@@ -198,7 +220,7 @@ shinyServer(function(input, output, session) {
                 }
                 
                 progress$set(message = 'Calculating Wald tests results', value = 2, detail=paste('Contrast: ', input$type, input$p1, input$p2))
-                res <- results(dds, contrast=c(input$type, input$p1, input$p2), test="Wald", addMLE=TRUE)
+                res <- results(dds, contrast=c(input$type, input$p1, input$p2), test="Wald")#, addMLE=TRUE)
                 rv$info <- paste0(elementMetadata(res)[,2], collapse='\n')
             }
             
@@ -226,7 +248,7 @@ shinyServer(function(input, output, session) {
     })
 
     output$data <- DT::renderDataTable({
-        if( input$apply == 0 ) stop(safeError('Press "Apply settings" to see the results table.'))
+        my_validate(need( input$apply != 0, 'Press "Apply settings" to see the results table.' ))
         if(is.null(rv$table)) return('Empty table')
         
         action = session$registerDataObj('iris', rv$table, shiny:::dataTablesJSON)
@@ -250,30 +272,31 @@ shinyServer(function(input, output, session) {
             rv$table, 
             #server = TRUE, 
             rownames = FALSE,
+            filter = 'top',
             #extensions = c('ColReorder', 'ColVis'),
             container = sketch,
             callback = DT::JS(readLines('callback.js')),
             plugins = 'natural',
             selection = 'none',
             options = list(
-                processing = TRUE,
-                serverSide = TRUE,
+                #processing = TRUE,
+                #serverSide = TRUE,
                 
-                deferRender = TRUE,
-                scrollY = 385,
+                #deferRender = TRUE,
+                #scrollY = 385,
                 
-                colReorder = list(realtime = TRUE),
-                order = DT::JS('[[ 11, "asc" ]]'),
-                pageLength = 10,
-                lengthMenu = DT::JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
-                columns = DT::JS(readLines('colDef.js')),
-                dom = 'RCT<"clear">lfrtip',
+                #colReorder = list(realtime = TRUE),
+                #order = DT::JS('[[ 11, "asc" ]]'),
+                #pageLength = 10,
+                #lengthMenu = DT::JS('[[10, 25, 50, 100, 1000, -1], [10, 25, 50, 100, 1000, "All"]]'),
+                columns = DT::JS(readLines('colDef.js'))
+                #dom = 'RCT<"clear">lfrtip'#,
                 #tableTools = list(aButtons=btn, sRowSelect="os"),
                 #fnServerParams= DT::JS("function(params) {Shiny.shinyapp.sendInput({sel:this.DataTable().ajax.params()});}"),
-                ajax = list(
-                    url = action, 
-                    type = 'POST'
-                )
+                #ajax = list(
+                #    url = action, 
+                #    type = 'POST'
+               # )
             )
         )
         DT::formatRound(dt, (5:9)+1, 2)
@@ -310,7 +333,7 @@ shinyServer(function(input, output, session) {
             paste('DEview_figure_', gsub(' ', '_', Sys.time()), '.pdf', sep='')
         },
         content = function(con) {
-            if(is.null(rv$plot)) stop('Plot something first (green button in result table).')
+            my_validate(need( !is.null(rv$plot), 'Plot something first (green button in result table).' ))
             pdf(con, height=6, width=12)
             print(rv$plot)
             dev.off()
@@ -480,15 +503,15 @@ shinyServer(function(input, output, session) {
                     searchDelay = 10,
                     search = list(regex = TRUE)
                 )
-            ) %>% formatDate(c('dateCreated', 'dateUpdated'), 'toLocaleDateString')
+            ) %>% formatDate(c('Created', 'Updated'), 'toLocaleDateString')
         })
     }
     
     output$RNAseq <- getDBtable(
         all_rna %>% dplyr::select(
-            RNApurification, LibraryType, ExtractID, Strain, Stage, ContactExpID, dateCreated, dateUpdated
+            RNApurification, LibraryType, ExtractID, Strain, Stage, ContactExpID, Created, Updated
         ) %>% mutate(
-            dateCreated=as.Date(dateCreated), dateUpdated=as.Date(dateUpdated)
+            Created=as.Date(Created), Updated=as.Date(Updated)
         )
     )
     
@@ -499,11 +522,18 @@ shinyServer(function(input, output, session) {
             {
         
                 ids <- unlist(all_rna[input$RNAseq_rows_selected,]$ContactExpID)
-                if (length(ids)==0) return()
+                my_validate(need( length(ids)>0, "Please select something!" ))
+                    
+               
+                
                 
                 bam <- lapply(ids, JADBtools::getFilePath, format = 'bam')
                 names(bam) <- ids
-                if (all(bam  %>% lengths == 1)) bam <- unlist(bam) else stop('Multiple experiments per ID')
+                my_validate(
+                    need(all(lengths(bam) >  0), 'Missing BAM file'),
+                    need(all(lengths(bam) == 1), 'Multiple experiments per ID')
+                )
+                bam <- unlist(bam)
                 
                 tmp <- tempdir()
                 message('tempdir: ', tmp)
@@ -536,6 +566,8 @@ shinyServer(function(input, output, session) {
                 
                 save(SEuniq, file=file.path('data', paste0(input$datasetName, '.Rdata')))
                 message('DONE!!!')
+                
+                return('Done')
                 
             }
         )

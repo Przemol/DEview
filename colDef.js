@@ -24,7 +24,7 @@
 
 
 { "title": 'Base mean', type: "number-range" },
-{ "title": 'MAP FC' },
+//{ "title": 'MAP FC' },
 { "title": 'LogFC' },
 { "title": 'FC error' },
 { "title": 'Statistic val' },
